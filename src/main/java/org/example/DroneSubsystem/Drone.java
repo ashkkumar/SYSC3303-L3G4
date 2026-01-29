@@ -67,13 +67,13 @@ public class Drone implements Runnable {
                 + event.id);
 
         status = DroneStatus.IN_FLIGHT;
-        simulateFlight();
+        travel();
 
         status = DroneStatus.EXTINGUISHING;
-        simulateExtinguish(event.getSeverity());
+        extinguish(event.getSeverity());
 
         status = DroneStatus.RETURNING;
-        simulateReturn();
+        returnToBase();
 
         status = DroneStatus.IDLE;
         System.out.println("[Drone " + droneId + "] returned to base");
@@ -82,7 +82,7 @@ public class Drone implements Runnable {
     /**
      * Travel time to the fire location.
      */
-    private void simulateFlight() {
+    private void travel() {
         // gotta use a calc (short for calculator btw) for some real values
         sleep(1);
     }
@@ -91,7 +91,7 @@ public class Drone implements Runnable {
      * Simulates fire extinguishing time based on fire severity.
      * @param severity the severity level of the fire
      */
-    private void simulateExtinguish(Severity severity) {
+    private void extinguish(Severity severity) {
         int extinguishTime;
 
         // need a calc
@@ -108,7 +108,7 @@ public class Drone implements Runnable {
     /**
      * Simulates the return flight after task completion.
      */
-    private void simulateReturn() {
+    private void returnToBase() {
         //calc
         sleep(1500);
     }
