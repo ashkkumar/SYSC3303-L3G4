@@ -1,4 +1,7 @@
-package org.example.DroneSubsystem;
+package FireFightingDroneSwarm.DroneSubsystem;
+
+import FireFightingDroneSwarm.FireIncidentSubsystem.FireEvent;
+import FireFightingDroneSwarm.FireIncidentSubsystem.TaskType;
 
 public class DroneTask {
 

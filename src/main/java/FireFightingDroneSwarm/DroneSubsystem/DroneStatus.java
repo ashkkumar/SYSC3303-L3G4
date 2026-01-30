@@ -1,4 +1,4 @@
-package org.example.DroneSubsystem;
+package FireFightingDroneSwarm.DroneSubsystem;
 
 public enum DroneStatus {
         IDLE,

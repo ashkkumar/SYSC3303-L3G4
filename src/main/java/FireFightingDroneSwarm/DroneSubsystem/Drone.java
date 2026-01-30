@@ -1,4 +1,6 @@
-package org.example.DroneSubsystem;
+package FireFightingDroneSwarm.DroneSubsystem;
+import FireFightingDroneSwarm.FireIncidentSubsystem.FireEvent;
+import FireFightingDroneSwarm.FireIncidentSubsystem.Severity;
 
 public class Drone implements Runnable {
 
@@ -64,7 +66,7 @@ public class Drone implements Runnable {
         FireEvent event = currentTask.getFireEvent();
 
         System.out.println("[Drone " + droneId + "] Dispatched to zone "
-                + event.id);
+                + event.getZoneID());
 
         status = DroneStatus.IN_FLIGHT;
         travel();
