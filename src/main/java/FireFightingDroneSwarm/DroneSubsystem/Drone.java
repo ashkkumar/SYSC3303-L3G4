@@ -1,6 +1,7 @@
 package FireFightingDroneSwarm.DroneSubsystem;
 import FireFightingDroneSwarm.FireIncidentSubsystem.FireEvent;
 import FireFightingDroneSwarm.FireIncidentSubsystem.Severity;
+import FireFightingDroneSwarm.Scheduler.Scheduler;
 
 public class Drone implements Runnable {
 

@@ -30,5 +30,8 @@ public class FireEvent {
         return severity;
     }
 
-
+    public String toString() {
+        return "FireEvent [zoneID=" + zoneID + ", taskType=" + taskType + ", timestamp=" +
+                timestamp + ", severity=" + severity + "]";
+    }
 }
