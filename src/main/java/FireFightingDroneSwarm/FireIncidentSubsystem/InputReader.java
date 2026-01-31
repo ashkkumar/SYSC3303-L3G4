@@ -1,7 +1,9 @@
 package FireFightingDroneSwarm.FireIncidentSubsystem;
 
 import java.io.BufferedReader;
-import java.io.FileReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalTime;
 import java.util.ArrayList;
 
@@ -10,33 +12,42 @@ import java.util.ArrayList;
  * event input file, and the zone input file
  */
 public class InputReader {
-    String eventFilePath;
-    String zoneFilePath;
+
+    /** Classpath resource name for event file */
+    private final String eventResource;
+
+    /** Classpath resource name for zone file */
+    private final String zoneResource;
 
     /**
      * Constructor for an InputReader object to process necessary files for the system
-     * @param eventFilePath absolute file path for event file
-     * @param zoneFilePath absolute file path for the zone file
+     *
+     * @param eventResource classpath resource name for event file
+     *                      (e.g. "events.txt" or "input/events.txt")
+     * @param zoneResource  classpath resource name for the zone file
+     *                      (e.g. "zones.txt" or "input/zones.txt")
      */
-    public InputReader(String eventFilePath, String zoneFilePath) {
-        this.zoneFilePath = zoneFilePath;
-        this.eventFilePath = eventFilePath;
+    public InputReader(String eventResource, String zoneResource) {
+        this.zoneResource = zoneResource;
+        this.eventResource = eventResource;
     }
 
     /**
      * This function handles all parsing of the event file, taking in the events and
      * creating FireEvent objects
+     *
      * @return an ArrayList of FireEvents read in from the file in the order presented
      */
     public ArrayList<FireEvent> parseEventFile() {
-        try {
-            BufferedReader br = new BufferedReader(new FileReader(eventFilePath));
+        ArrayList<FireEvent> events = new ArrayList<>();
+
+        try (BufferedReader br = createReader(eventResource)) {
             String line;
-            ArrayList<FireEvent> events = new ArrayList<>();
-            while((line = br.readLine()) != null){
+
+            while ((line = br.readLine()) != null) {
                 boolean isEvent = line.matches(".*[0-9].*");
 
-                if(isEvent){
+                if (isEvent) {
                     String[] tokens = line.split(",");
 
                     LocalTime timestamp = LocalTime.parse(tokens[0]);
@@ -44,7 +55,7 @@ public class InputReader {
                     TaskType taskType = null;
                     Severity severity = null;
 
-                    switch(tokens[2]){
+                    switch (tokens[2]) {
                         case "DRONE_REQUEST":
                             taskType = TaskType.DRONE_REQUESTED;
                             break;
@@ -53,7 +64,7 @@ public class InputReader {
                             break;
                     }
 
-                    switch(tokens[3]) {
+                    switch (tokens[3]) {
                         case "Low":
                             severity = Severity.LOW;
                             break;
@@ -65,62 +76,87 @@ public class InputReader {
                             break;
                     }
 
-                    FireEvent event = new FireEvent(zoneID, taskType, timestamp, severity);
+                    FireEvent event =
+                            new FireEvent(zoneID, taskType, timestamp, severity);
                     events.add(event);
-                    //scheduler.notify(event);
                 }
             }
-            br.close();
-            return events;
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return null;
+
+        return events;
     }
 
     /**
      * This function handles all parsing of the zone file, taking in the zone information and
      * creating Zone objects
+     *
      * @return an ArrayList of Zones read in from the file in the order presented
      */
-    public ArrayList<Zone> parseZoneFile(){
-        try{
+    public ArrayList<Zone> parseZoneFile() {
+        ArrayList<Zone> zones = new ArrayList<>();
 
-            BufferedReader br = new BufferedReader(new FileReader(zoneFilePath));
+        try (BufferedReader br = createReader(zoneResource)) {
             String line;
-            ArrayList<Zone> zones = new ArrayList<>();
 
-            while((line = br.readLine()) != null){
+            while ((line = br.readLine()) != null) {
                 boolean isZone = line.matches(".*[0-9].*");
-                if(isZone){
+
+                if (isZone) {
                     String[] tokens = line.split(",");
 
                     int zoneID = Integer.parseInt(tokens[0]);
                     int[] startCoordinates = parseCoordinates(tokens[1]);
                     int[] endCoordinates = parseCoordinates(tokens[2]);
 
-                    Zone zone = new Zone(zoneID, startCoordinates, endCoordinates);
+                    Zone zone =
+                            new Zone(zoneID, startCoordinates, endCoordinates);
                     zones.add(zone);
                 }
             }
-            br.close();
-            return zones;
-        } catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
 
-        return null;
+        return zones;
     }
 
-    public int[] parseCoordinates(String coordinates){
+    /**
+     * Helper function to create a BufferedReader for a classpath resource
+     *
+     * @param resourceName classpath resource name
+     * @return BufferedReader for the resource
+     * @throws IllegalArgumentException if the resource cannot be found
+     */
+    private BufferedReader createReader(String resourceName) {
+        InputStream is = getClass()
+                .getClassLoader()
+                .getResourceAsStream(resourceName);
+
+        if (is == null) {
+            throw new IllegalArgumentException(
+                    "Resource not found: " + resourceName);
+        }
+
+        return new BufferedReader(
+                new InputStreamReader(is, StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Helper function to parse coordinate strings of the form "(x;y)"
+     *
+     * @param coordinates coordinate string representation
+     * @return integer array containing x and y coordinates
+     */
+    public int[] parseCoordinates(String coordinates) {
         String[] tokens = coordinates.split(";");
-        String stringRepX = tokens[0].replaceAll("\\(", "");
-        String stringRepY = tokens[1].replaceAll("\\)", "");
+        String stringRepX = tokens[0].replace("(", "");
+        String stringRepY = tokens[1].replace(")", "");
 
         int x = Integer.parseInt(stringRepX);
         int y = Integer.parseInt(stringRepY);
 
         return new int[]{x, y};
     }
-
 }

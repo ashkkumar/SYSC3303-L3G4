@@ -59,9 +59,14 @@ public class IncidentReporter implements Runnable {
     public void run() {
         while(nextEvent < events.size()){
             FireEvent event = events.get(nextEvent);
-            scheduler.put(event);
+            try {
+                scheduler.put(event);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
             nextEvent++;
         }
+        scheduler.setAllTasksSent(true);
     }
 
     /**
@@ -70,7 +75,7 @@ public class IncidentReporter implements Runnable {
      * @param event the event confirmed/completed by a drone
      */
     public void getEventConfirmation(FireEvent event){
-        System.out.println("Recieved event confirmation");
+        System.out.println("[Incident Subsystem] recieved event confirmation " + event.toString());
     }
 
 }
