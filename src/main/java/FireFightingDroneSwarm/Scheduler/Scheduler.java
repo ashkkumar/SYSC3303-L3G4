@@ -15,5 +15,8 @@ public class Scheduler {
         System.out.println(fireEvent);
     }
 
+    public synchronized void put(FireEvent fireEvent){
+        System.out.println("Recieved put fire event");
+    }
 
 }
