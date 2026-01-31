@@ -9,6 +9,7 @@ public class Drone implements Runnable {
     private volatile DroneStatus status;
     public FireEvent currentTask;
     private final Scheduler scheduler;
+    private static final double DRONE_SPEED = 20.0; // units per second (Iteration 0)
 
     /**
      * Creates a Drone object
@@ -65,7 +66,10 @@ public class Drone implements Runnable {
      */
     private void travel() {
         // gotta use a calc (short for calculator btw) for some real values
-        sleep(1);
+        double distance = calculateDistanceToZone(currentTask.getZoneID());
+        long travelTimeMs = (long) ((distance / DRONE_SPEED) * 1000);
+
+        sleep((int) travelTimeMs);
     }
 
     /**
@@ -90,8 +94,16 @@ public class Drone implements Runnable {
      * Simulates the return flight after task completion.
      */
     private void returnToBase() {
-        //calc
-        sleep(1500);
+
+        double distance = calculateDistanceToZone(currentTask.getZoneID());
+        long returnTimeMs = (long) ((distance / DRONE_SPEED) * 1000);
+
+        sleep((int) returnTimeMs);
+    }
+
+    private double calculateDistanceToZone(int zoneID) {
+        // add in a proper distance calc based on coords
+        return zoneID * 10.0;  // simple distance model
     }
 
     /**
