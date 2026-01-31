@@ -1,25 +1,86 @@
-# Firefighting Drone Swarm Project
-# SYSC3303, Group 4
-Members: Ashwin Kumar, Abhiram Sureshkumar, Jason Keah, Maryam Manjra 
+# Firefighting Drone Swarm Project  
+**SYSC 3303 – Real-Time Concurrent Systems**  
+**Group 4**
 
-This project is built using OpenJDK 21.0.8, prior versions supporting standard Swing, Thread, and the ArrayDeque<> implementations are necessary. 
+## Group Members
+- Ashwin Kumar  
+- Abhiram Sureshkumar  
+- Jason Keah  
+- Maryam Manjra  
 
-# Iteration 1 
-All project code files can be found in the package labelled FireFightingDroneSwarm. The main system setup and deployment class is labelled DroneSystemTest. 
-The Drone Subsystem is implemented in the subpackage DroneSubsystem with classes for the Drone thread and an enum for Drone Status. 
+## Project Overview
 
-The Incident Subsystem is implemented in the subpackage FireIncidentSubsystem and includes an object for representing events called FireEvent, a input parsing class called InputReader, enums for severity, and task type, a Zone class, and finally the IncidentReporter thread for notifying the scheduler.
+This project simulates a **firefighting drone swarm system** using concurrent subsystems that communicate through a central Scheduler. The system models how fire incidents are detected, dispatched, and handled by drones in a time-based simulation environment.
 
-The Scheduler is implemented in the subpackage Scheduler and has minimal implementation for acting as a communication channel. 
+The project emphasizes:
+- Thread-based concurrency  
+- Subsystem interaction  
+- Event-driven scheduling  
+- Incremental system development across iterations
 
-The UI is implemented in the UserInterface subpackage using Swing, and can be run separately from the system in the UserInterface class file.
+## Subsystems 
 
-Resources like the zone and event files are located in src/main/resources. 
+#### Drone Subsystem (`DroneSubsystem`)
 
-To run the simulation, please run main in the DroneSystemTest file. Console output will be visible for the events. To view the GUI please run the main method in UserInterface. 
+- `Drone` – Active thread representing a drone  
+- `DroneStatus` – Enum representing drone states (IDLE, IN_FLIGHT, etc.)
 
-Responsibility breakdown:
-Ashwin Kumar - Drone Subsystem + Test 
-Maryam Manjra - Fire Incident Subsystem + Sequence Diagram
-Jason Keah - GUI + UML Class Diagram
-Abhiram Sureshkumar - Scheduler 
+#### Fire Incident Subsystem (`FireIncidentSubsystem`)
+- `FireEvent` – Represents a fire incident  
+- `InputReader` – Parses zone and event CSV files  
+- `Severity` – Enum representing fire severity  
+- `TaskType` – Enum representing incident task types  
+- `Zone` – Represents a geographic fire zone  
+- `IncidentReporter` – Thread responsible for notifying the Scheduler  
+
+#### Scheduler (`Scheduler`)
+- Acts as the communication hub between subsystems  
+- Buffers fire events and dispatches tasks to drones  
+- Receives task completion confirmations  
+
+#### User Interface (`UserInterface`)
+- Swing-based graphical interface  
+- Can be run independently from the simulation logic
+
+## Technology & Requirements
+
+- **Java Version:** OpenJDK 21.0.8  
+  (Earlier Java versions supporting standard `Thread`, `Swing`, and `ArrayDeque<>` functionality may also work.)
+- **Build Tool:** Maven  
+- **UI Framework:** Java Swing  
+
+## Project Structure
+
+All project source code is located under the package:
+
+src/main/resources
+These include:
+Zone definition CSV files
+Fire event CSV files
+All test scenarios use these files for repeatable system testing.
+How to Set Up and Run the Project
+1. Import the Project
+Open the project in IntelliJ IDEA (or another Java IDE)
+Import as a Maven project
+Ensure the correct JDK (OpenJDK 21.0.8) is selected
+2. Build the Project
+Using Maven:
+mvn clean compile
+Or build directly through your IDE.
+3. Run the Simulation (Iteration 1)
+Navigate to: FireFightingDroneSwarm.DroneSystemTest Run the main() method
+Console output will display: Zone loading, Fire event parsing, Scheduler buffering, Drone dispatch and task completion
+
+## Testing
+System-level testing for Iteration 1 is performed through the DroneSystemTest class.
+Multiple test scenarios are executed using different input CSV files to validate:
+- Subsystem communication
+- Task sequencing
+- Concurrent execution behavior
+- Note: Due to concurrency, console output may appear interleaved. This is expected.
+
+## Responsibility Breakdown
+Ashwin Kumar – Drone Subsystem implementation and system testing
+Maryam Manjra – Fire Incident Subsystem and sequence diagram
+Jason Keah – Graphical User Interface and UML class diagram
+Abhiram Sureshkumar – Scheduler subsystem implementation
