@@ -28,7 +28,7 @@ public class DroneTask {
 
     /**
      * Returns the task type
-      * @return the taskType
+     * @return the taskType
      */
     public TaskType getTaskType() {
         return taskType;

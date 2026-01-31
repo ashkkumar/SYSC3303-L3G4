@@ -1,4 +1,5 @@
 package FireFightingDroneSwarm.FireIncidentSubsystem;
+import FireFightingDroneSwarm.Scheduler.Scheduler;
 import java.time.LocalTime;
 
 /**
@@ -11,6 +12,7 @@ public class FireEvent {
     private TaskType taskType;
     private LocalTime timestamp;
     private Severity severity;
+    private Scheduler scheduler;
 
     /**
      * Constructor for a FireEvent object, to represent incoming fire events.
