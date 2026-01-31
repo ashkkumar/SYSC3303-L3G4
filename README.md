@@ -4,7 +4,7 @@ Members: Ashwin Kumar, Abhiram Sureshkumar, Jason Keah, Maryam Manjra
 
 This project is built using OpenJDK 21.0.8, prior versions supporting standard Swing, Thread, and the ArrayDeque<> implementations are necessary. 
 
-#Iteration 1 
+# Iteration 1 
 All project code files can be found in the package labelled FireFightingDroneSwarm. The main system setup and deployment class is labelled DroneSystemTest. 
 The Drone Subsystem is implemented in the subpackage DroneSubsystem with classes for the Drone thread and an enum for Drone Status. 
 
