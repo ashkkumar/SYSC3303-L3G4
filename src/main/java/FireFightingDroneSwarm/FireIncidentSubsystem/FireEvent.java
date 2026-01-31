@@ -1,11 +1,13 @@
 package FireFightingDroneSwarm.FireIncidentSubsystem;
+import FireFightingDroneSwarm.Scheduler.Scheduler;
 import java.time.LocalTime;
 
-public class FireEvent {
+public class FireEvent{
     private int zoneID;
     private TaskType taskType;
     private LocalTime timestamp;
     private Severity severity;
+    private Scheduler scheduler;
 
     public FireEvent(int zone, TaskType taskType, LocalTime timestamp, Severity severity) {
         this.zoneID = zone;

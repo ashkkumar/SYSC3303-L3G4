@@ -6,8 +6,8 @@ import FireFightingDroneSwarm.Scheduler.Scheduler;
 public class Drone implements Runnable {
 
     private final int droneId;
-    private DroneStatus status;
-    private DroneTask currentTask;
+    private volatile DroneStatus status;
+    public DroneTask currentTask;
     private final Scheduler scheduler;
 
     /**
@@ -29,7 +29,7 @@ public class Drone implements Runnable {
      */
     public synchronized void assignTask(DroneTask task) {
         this.currentTask = task;
-        notify(); // wake drone thread
+        notifyAll();
     }
 
     /**
@@ -38,8 +38,9 @@ public class Drone implements Runnable {
      */
     @Override
     public void run() {
-        while (true) {
+        while (!Thread.currentThread().isInterrupted()) {
             waitForTask();
+            if (Thread.currentThread().isInterrupted()) break;
             executeTask();
             notifyScheduler();
         }
@@ -54,6 +55,7 @@ public class Drone implements Runnable {
                 wait();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+                return;
             }
         }
     }
@@ -120,8 +122,18 @@ public class Drone implements Runnable {
      * Notifies the Scheduler that the current task has been completed.
      */
     private void notifyScheduler() {
-        scheduler.confirmation(currentTask);
-        currentTask = null;
+        DroneTask finished;
+        synchronized (this) {
+            finished = currentTask;
+        }
+        boolean ok = scheduler.confirmation(finished);
+        if (ok) {
+            synchronized (this) {
+                if (currentTask == finished) {
+                    currentTask = null;
+                }
+            }
+        }
     }
 
     /**
@@ -136,4 +148,9 @@ public class Drone implements Runnable {
             Thread.currentThread().interrupt();
         }
     }
+
+    public synchronized boolean isIdle() {
+        return currentTask == null && status == DroneStatus.IDLE;
+    }
+
 }
