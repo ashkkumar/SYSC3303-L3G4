@@ -80,7 +80,7 @@ Multiple test scenarios are executed using different input CSV files to validate
 - Note: Due to concurrency, console output may appear interleaved. This is expected.
 
 ## Responsibility Breakdown
-Ashwin Kumar – Drone Subsystem implementation and system testing
-Maryam Manjra – Fire Incident Subsystem and sequence diagram
-Jason Keah – Graphical User Interface and UML class diagram
-Abhiram Sureshkumar – Scheduler subsystem implementation
+- Ashwin Kumar – Drone Subsystem implementation and system testing
+- Maryam Manjra – Fire Incident Subsystem and sequence diagram
+- Jason Keah – Graphical User Interface and UML class diagram
+- Abhiram Sureshkumar – Scheduler subsystem implementation
