@@ -59,7 +59,11 @@ public class IncidentReporter implements Runnable {
     public void run() {
         while(nextEvent < events.size()){
             FireEvent event = events.get(nextEvent);
-            scheduler.put(event);
+            try {
+                scheduler.put(event);
+            } catch (InterruptedException e) {
+                return;
+            }
             nextEvent++;
         }
     }
