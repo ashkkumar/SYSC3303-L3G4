@@ -3,6 +3,7 @@ package FireFightingDroneSwarm;
 
 import FireFightingDroneSwarm.DroneSubsystem.Drone;
 import FireFightingDroneSwarm.FireIncidentSubsystem.FireEvent;
+import FireFightingDroneSwarm.FireIncidentSubsystem.IncidentReporter;
 import FireFightingDroneSwarm.FireIncidentSubsystem.InputReader;
 import FireFightingDroneSwarm.Scheduler.Scheduler;
 
