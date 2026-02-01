@@ -72,7 +72,8 @@ Navigate to: FireFightingDroneSwarm.DroneSystemTest Run the main() method
 Console output will display: Zone loading, Fire event parsing, Scheduler buffering, Drone dispatch and task completion
 
 ## Testing
-System-level testing for Iteration 1 is performed through the DroneSystemTest class.
+System-level testing for Iteration 1 is performed through the DroneSystemTest.java class, running this file will execute the main() and perform the tests.
+Two test functions are used singleIncident() and multipleIncidents().
 Multiple test scenarios are executed using different input CSV files to validate:
 - Subsystem communication
 - Task sequencing
