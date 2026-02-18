@@ -48,17 +48,54 @@ public class Drone implements Runnable {
         System.out.println("[Drone " + droneId + "] Dispatched to zone "
                 + currentTask.getZoneID());
 
-        status = DroneStatus.IN_FLIGHT;
+        // needa sort this out
+        transition(DroneStatus.EN_ROUTE);
         travel();
 
-        status = DroneStatus.EXTINGUISHING;
+        transition(DroneStatus.ARRIVED);
+
+        transition(DroneStatus.DROPPING_AGENT);
         extinguish(currentTask.getSeverity());
 
-        status = DroneStatus.RETURNING;
+        transition(DroneStatus.DROPPING_AGENT);
         returnToBase();
 
-        status = DroneStatus.IDLE;
+        transition(DroneStatus.IDLE);
         System.out.println("[Drone " + droneId + "] returned to base");
+    }
+
+    /**
+     * Validates if the new status is a valid transiton
+     * @param newStatus The new state of the drone
+     */
+    private synchronized void transition(DroneStatus newStatus) {
+        System.out.println("[Drone " + droneId + " " + status + " + ] Transitioning to " + newStatus);
+
+        // we wanna check that the transition is valid, no illegal moves
+        // IDLE - > EN_ROUTE -> ARRIVED -> DROPPING_AGENT -> EN_ROUTE or RETURNING -> REFILLING -> IDLE
+        switch (status){
+            case IDLE:
+                if (newStatus != DroneStatus.EN_ROUTE) return;
+                break;
+            case EN_ROUTE:
+                if  (newStatus != DroneStatus.ARRIVED) return;
+                break;
+            case ARRIVED:
+                if (newStatus != DroneStatus.DROPPING_AGENT) return;
+                break;
+            case DROPPING_AGENT:
+                if (newStatus != DroneStatus.RETURNING &&
+                    newStatus != DroneStatus.EN_ROUTE) return;
+                break;
+            case RETURNING:
+                if (newStatus != DroneStatus.IDLE) return;
+                break;
+            case REFILLING:
+                if (newStatus != DroneStatus.IDLE) return;
+                break;
+        }
+        status = newStatus;
+
     }
 
     /**

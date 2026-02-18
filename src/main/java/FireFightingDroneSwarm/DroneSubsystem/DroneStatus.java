@@ -2,7 +2,9 @@ package FireFightingDroneSwarm.DroneSubsystem;
 
 public enum DroneStatus {
         IDLE,
-        IN_FLIGHT,
-        EXTINGUISHING,
-        RETURNING
+        EN_ROUTE,
+        ARRIVED,
+        DROPPING_AGENT,
+        RETURNING,
+        REFILLING
 }
