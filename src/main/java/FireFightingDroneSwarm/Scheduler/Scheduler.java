@@ -3,8 +3,10 @@ package FireFightingDroneSwarm.Scheduler;
 import FireFightingDroneSwarm.DroneSubsystem.Drone;
 import FireFightingDroneSwarm.FireIncidentSubsystem.FireEvent;
 import FireFightingDroneSwarm.FireIncidentSubsystem.IncidentReporter;
+import FireFightingDroneSwarm.FireIncidentSubsystem.Zone;
 
 import java.util.ArrayDeque;
+import java.util.Map;
 import java.util.Queue;
 
 /**
@@ -20,6 +22,7 @@ public class Scheduler implements Runnable {
     private IncidentReporter incidentReporter;
     private boolean allTasksSent;
     private boolean allTasksProcessed;
+    private Map<Integer, Zone> zoneIDs;
 
     /**
      * Constructor for the scheduler, default drones and incident
@@ -124,6 +127,29 @@ public class Scheduler implements Runnable {
      */
     public synchronized boolean getAllTasksProcessed() {
         return this.allTasksProcessed;
+    }
+
+    /**
+     * Setter for a map of ZoneIDs
+     * @param zoneIDs
+     */
+    public void setZoneIDs(Map<Integer, Zone> zoneIDs) {
+        this.zoneIDs = zoneIDs;
+    }
+
+    /**
+     * Finds the start and end coordinates from the zone
+     * @param zoneId the zone's ID
+     * @return double[] with the coordinates
+     */
+    public synchronized double[] getZoneCenter(int zoneId) {
+        if (zoneIDs == null) throw new IllegalStateException("zonesById not set");
+        Zone z = zoneIDs.get(zoneId);
+        if (z == null) throw new IllegalArgumentException("Unknown zoneId: " + zoneId);
+
+        int[] s = z.getStartCoordinates();
+        int[] e = z.getEndCoordinates();
+        return new double[]{ (s[0] + e[0]) / 2.0, (s[1] + e[1]) / 2.0 };
     }
 
     /**
