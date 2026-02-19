@@ -151,14 +151,44 @@ public class ZoneDisplay {
         zoneMap.addZone(rect, zone);
     }
 
+    public void fireDetected(Zone zone){ // Refactor to send ID?
+        zoneMap.fireDetected(zone);
+    }
+
+    public void fireExtinguished(Zone zone){
+        zoneMap.fireExtinguished(zone);
+    }
+
+    public void fireTimeElapsed(Zone zone){
+        zoneMap.fireTimeElapsed(zone);
+    }
+
     static class ZoneMapPanel extends JPanel {
 
         private final java.util.List<Rectangle> rectangles = new ArrayList<>();
         private final java.util.List<Zone> zones = new ArrayList<>();
+        private final java.util.List<Integer> activeFires = new ArrayList<>();
+        private final java.util.List<Integer> extinguishedFires = new ArrayList<>();
 
         public void addZone(Rectangle rect, Zone zone) {
             rectangles.add(rect);
             zones.add(zone);
+            repaint();
+        }
+
+        public void fireDetected(Zone zone){
+            activeFires.add(zone.getID());
+            repaint();
+        }
+
+        public void fireExtinguished(Zone zone){
+            activeFires.remove((Integer) zone.getID());
+            extinguishedFires.add(zone.getID());
+            repaint();
+        }
+
+        public void fireTimeElapsed(Zone zone){
+            extinguishedFires.remove((Integer) zone.getID());
             repaint();
         }
 
@@ -177,15 +207,27 @@ public class ZoneDisplay {
 
             for (int i = 0; i < rectangles.size(); i++) {
                 Rectangle rect = rectangles.get(i);
-                Zone zone = zones.get(i);
+                Zone zone = zones.get(i); // relying on them being in order here - is this safe? Yes, because they get added in a function call internally.
 
                 g2.setColor(Color.BLUE);
                 g2.drawRect(rect.x, rect.y, rect.width, rect.height);
 
                 g2.setColor(Color.BLACK);
                 g2.drawString("Zone " + zone.getID(), rect.x + 5, rect.y + 20);
+
+                if(activeFires.contains(zone.getID())){
+                    g2.setColor(Color.RED);
+                    g2.fillRect((int) rect.getCenterX(), (int) rect.getCenterY(), 2 * CELL_SIZE, 2 * CELL_SIZE);
+                }
+
+                if(extinguishedFires.contains(zone.getID())){
+                    g2.setColor(new Color(80, 150, 70));
+                    g2.fillRect((int) rect.getCenterX(), (int) rect.getCenterY(), 2 * CELL_SIZE, 2 * CELL_SIZE);
+                }
             }
+
         }
+
     }
 
     public static void main(String[] args){
@@ -219,5 +261,22 @@ public class ZoneDisplay {
         zoneDisplay.calculateZone(zoneTwo);
         zoneDisplay.calculateZone(zoneThree);
         zoneDisplay.calculateZone(zoneFour);
+        zoneDisplay.fireDetected(zoneOne);
+
+        try{
+            Thread.sleep(200);
+        } catch (Exception e){
+            e.printStackTrace();
+        }
+
+        zoneDisplay.fireExtinguished(zoneOne);
+
+        try{
+            Thread.sleep(200);
+        } catch (Exception e){
+            e.printStackTrace();
+        }
+
+        zoneDisplay.fireTimeElapsed(zoneOne);
     }
 }

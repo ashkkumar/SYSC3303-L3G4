@@ -139,6 +139,5 @@ public class UserInterface extends JFrame {
         ui.setZoneBackgroundColor(2, 1, 1, new Color(255, 255, 200));
         ui.setVisible(true);
 
-
     }
 }
