@@ -3,7 +3,6 @@ package FireFightingDroneSwarm.UserInterface;
 import FireFightingDroneSwarm.FireIncidentSubsystem.Zone;
 
 import javax.swing.*;
-import javax.swing.border.Border;
 import java.awt.*;
 import java.util.HashMap;
 import java.util.Map;
@@ -11,22 +10,18 @@ import java.util.ArrayList;
 
 public class ZoneDisplay {
 
-    private int totalZoneLength;
-    private int totalZoneHeight;
-    private Map<Integer, Integer> zoneLengths;
-    private Map<Integer, Integer> zoneHeights;
-    private int lengthScale;
-    private int heightScale;
+    private final Map<Integer, Integer> zoneLengths;
+    private final Map<Integer, Integer> zoneHeights;
+    private double lengthScale;
+    private double heightScale;
+
     private static final int MAP_LENGTH = 900;
     private static final int MAP_HEIGHT = 600;
+    private static final int CELL_SIZE = 10;
+
+    private ZoneMapPanel zoneMap;
 
     public ZoneDisplay(){
-        totalZoneLength = 0;
-        totalZoneHeight = 0;
-
-        lengthScale = 0;
-        heightScale = 0;
-
         zoneLengths = new HashMap<>();
         zoneHeights = new HashMap<>();
     }
@@ -36,85 +31,193 @@ public class ZoneDisplay {
         JFrame frame = new JFrame();
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setTitle("Fire Fighting Drone Swarm - Group 4");
-        frame.setLayout(null);
-        frame.setSize(1200, 800);
-        frame.getContentPane().setBackground(Color.WHITE);
-
-        JPanel zoneMap = new JPanel();
-        zoneMap.setBounds(100, 100, MAP_LENGTH, MAP_HEIGHT);
+        frame.setSize(1300, 800);
+        frame.setLayout(new BorderLayout());   
+        
+        zoneMap = new ZoneMapPanel();
+        zoneMap.setPreferredSize(new Dimension(MAP_LENGTH, MAP_HEIGHT));
         zoneMap.setBackground(Color.WHITE);
 
-        buildZone(zoneMap, 60, 90);
-        frame.add(zoneMap);
+        JPanel backgroundPanel = new JPanel(new GridBagLayout());
+        backgroundPanel.setBackground(Color.WHITE);
+        backgroundPanel.add(zoneMap);
 
-        JPanel legend = new JPanel();
-        legend.setBounds(750, 100, 250, 700);
-        legend.setBackground(new Color(38, 162, 224));
-        //frame.add(legend);
+        frame.add(backgroundPanel, BorderLayout.CENTER);
+        JPanel legend = createLegendPanel();
+        legend.setPreferredSize(new Dimension(300, 600));
+        frame.add(legend, BorderLayout.EAST);
 
         frame.setVisible(true);
     }
 
-    public static void main(String[] args){
-        ZoneDisplay zoneDisplay = new ZoneDisplay();
-        zoneDisplay.buildUserInterface();
+    private JPanel createLegendPanel() {
+        JPanel legend = new JPanel(new GridBagLayout());
+        legend.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        legend.setBackground(Color.WHITE);
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.gridx = 0;
+        gbc.gridy = GridBagConstraints.RELATIVE;
+        gbc.anchor = GridBagConstraints.WEST;
+        gbc.insets = new Insets(5, 5, 5, 5); // EXACTLY as you had
+
+        addLegendItem(legend, gbc, "Z(n)", new Color(220, 235, 220), "Zone Label", Color.BLACK);
+        addLegendItem(legend, gbc, "", Color.RED, "Active fire", Color.WHITE);
+        addLegendItem(legend, gbc, "", new Color(80, 150, 70), "Extinguished fire", Color.WHITE);
+        addLegendItem(legend, gbc, "D(n)", new Color(255, 165, 0), "Drone outbound", Color.BLACK);
+        addLegendItem(legend, gbc, "D(n)", new Color(34, 139, 34), "Drone Extinguishing fire", Color.WHITE);
+        addLegendItem(legend, gbc, "D(3)", new Color(180, 130, 180), "Drone Returning", Color.BLACK);
+
+        return legend;
     }
 
-    public void buildZone(JPanel zone, int rows, int columns) {
-        zone.setLayout(new GridLayout(rows, columns));
+    private void addLegendItem(JPanel panel, GridBagConstraints gbc, String iconText, Color boxColor, String description, Color textColor) {
+        JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        row.setBackground(Color.WHITE);
 
-        Border cellBorder = BorderFactory.createLineBorder(new Color(230, 230, 230));
+        JPanel icon = new JPanel(new GridBagLayout());
+        icon.setPreferredSize(new Dimension(40, 25));
+        icon.setBackground(boxColor);
+        icon.setBorder(BorderFactory.createLineBorder(Color.BLACK));
 
-        for (int r = 0; r < rows; r++) {
-            for (int c = 0; c < columns; c++) {
-
-                JPanel cell = new JPanel(new BorderLayout());
-                cell.setBackground(Color.WHITE);
-                cell.setBorder(cellBorder);
-                zone.add(cell);
-            }
+        if (!iconText.isEmpty()) {
+            JLabel text = new JLabel(iconText);
+            text.setFont(new Font("SansSerif", Font.BOLD, 11));
+            text.setForeground(textColor);
+            icon.add(text);
         }
+
+        JLabel label = new JLabel(description);
+        label.setFont(new Font("SansSerif", Font.PLAIN, 13));
+
+        row.add(icon);
+        row.add(label);
+
+        panel.add(row, gbc);
     }
 
     public void findScalingFactor(ArrayList<Zone> zones){
 
-        for(Zone z: zones){
-            int length = zoneLengths.get(z.getEndCoordinates()[0] - z.getStartCoordinates()[0]);
-            if(zoneLengths.containsKey(z.getStartCoordinates()[1])) {
-                zoneLengths.put(zoneLengths.get(z.getStartCoordinates()[1]), length);
-            } else {
-                zoneLengths.put(zoneLengths.get(z.getStartCoordinates()[0]), length);
-            }
+        int totalZoneLength = 0;
+        int totalZoneHeight = 0;
+
+        zoneLengths.clear();
+        zoneHeights.clear();
+
+        for (Zone z : zones) {
+            int startY = z.getStartCoordinates()[1];
+            int zoneLength = z.getEndCoordinates()[0] - z.getStartCoordinates()[0];
+
+            zoneLengths.put(
+                    startY,
+                    zoneLengths.getOrDefault(startY, 0) + zoneLength
+            );
+        }
+
+        for (int length : zoneLengths.values()) {
             totalZoneLength = Math.max(totalZoneLength, length);
         }
 
+        for (Zone z : zones) {
+            int startX = z.getStartCoordinates()[0];
+            int zoneHeight = z.getEndCoordinates()[1] - z.getStartCoordinates()[1];
 
-        for(Zone z: zones){
-            int height = zoneLengths.get(z.getEndCoordinates()[1] - z.getStartCoordinates()[1]);
-            if(zoneHeights.containsKey(z.getStartCoordinates()[0])) {
-                zoneHeights.put(zoneHeights.get(z.getStartCoordinates()[0]), height);
-            } else {
-                zoneHeights.put(zoneHeights.get(z.getStartCoordinates()[0]), height);
-            }
+            zoneHeights.put(
+                    startX,
+                    zoneHeights.getOrDefault(startX, 0) + zoneHeight
+            );
+        }
+
+        for (int height : zoneHeights.values()) {
             totalZoneHeight = Math.max(totalZoneHeight, height);
         }
 
-        lengthScale = MAP_LENGTH / totalZoneLength;
-        heightScale = MAP_HEIGHT / totalZoneHeight;
+        lengthScale = (double) MAP_LENGTH / totalZoneLength;
+        heightScale = (double) MAP_HEIGHT / totalZoneHeight;
     }
 
     public void calculateZone(Zone zone){
+
         int zoneLength = zone.getEndCoordinates()[0] - zone.getStartCoordinates()[0];
         int zoneHeight = zone.getEndCoordinates()[1] - zone.getStartCoordinates()[1];
 
-        int numLengthPixels = zoneLength * lengthScale;
-        int numHeightPixels = zoneHeight * heightScale;
+        int pixelWidth = (int) (zoneLength * lengthScale);
+        int pixelHeight = (int) (zoneHeight * heightScale);
+
+        int startX = (int) (zone.getStartCoordinates()[0] * lengthScale);
+        int startY = (int) (zone.getStartCoordinates()[1] * heightScale);
+
+        Rectangle rect = new Rectangle(startX, startY, pixelWidth, pixelHeight);
+        zoneMap.addZone(rect, zone);
     }
 
-    public void outlineZone(int length, int height, int startX, int startY){
+    static class ZoneMapPanel extends JPanel {
 
+        private final java.util.List<Rectangle> rectangles = new ArrayList<>();
+        private final java.util.List<Zone> zones = new ArrayList<>();
+
+        public void addZone(Rectangle rect, Zone zone) {
+            rectangles.add(rect);
+            zones.add(zone);
+            repaint();
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+
+            Graphics2D g2 = (Graphics2D) g;
+
+            g2.setColor(new Color(230, 230, 230));
+            for (int x = 0; x <= MAP_LENGTH; x += CELL_SIZE) g2.drawLine(x, 0, x, MAP_HEIGHT);
+            for (int y = 0; y <= MAP_HEIGHT; y += CELL_SIZE) g2.drawLine(0, y, MAP_LENGTH, y);
+
+            g2.setStroke(new BasicStroke(3));
+            g2.setFont(new Font("Monospaced", Font.BOLD, 14));
+
+            for (int i = 0; i < rectangles.size(); i++) {
+                Rectangle rect = rectangles.get(i);
+                Zone zone = zones.get(i);
+
+                g2.setColor(Color.BLUE);
+                g2.drawRect(rect.x, rect.y, rect.width, rect.height);
+
+                g2.setColor(Color.BLACK);
+                g2.drawString("Zone " + zone.getID(), rect.x + 5, rect.y + 20);
+            }
+        }
+    }
+
+    public static void main(String[] args){
+
+        ZoneDisplay zoneDisplay = new ZoneDisplay();
+        zoneDisplay.buildUserInterface();
+
+        int[] zoneOneStart = {0,0};
+        int[] zoneOneEnd = {600, 1300};
+        int[] zoneTwoStart = {600,0};
+        int[] zoneTwoEnd = {1300, 1300};
+        int[] zoneThreeStart = {0,1300};
+        int[] zoneThreeEnd = {1300, 1600};
+        int[] zoneFourStart = {1300,1300};
+        int[] zoneFourEnd = {1600, 1600};
+
+        Zone zoneOne = new Zone(1, zoneOneStart, zoneOneEnd);
+        Zone zoneTwo = new Zone(2, zoneTwoStart, zoneTwoEnd);
+        Zone zoneThree = new Zone(3, zoneThreeStart, zoneThreeEnd);
+        Zone zoneFour = new Zone(4, zoneFourStart, zoneFourEnd);
+
+        ArrayList<Zone> zones = new ArrayList<>();
+        zones.add(zoneOne);
+        zones.add(zoneTwo);
+        zones.add(zoneThree);
+        zones.add(zoneFour);
+
+        zoneDisplay.findScalingFactor(zones);
+
+        zoneDisplay.calculateZone(zoneOne);
+        zoneDisplay.calculateZone(zoneTwo);
+        zoneDisplay.calculateZone(zoneThree);
+        zoneDisplay.calculateZone(zoneFour);
     }
 }
-
-
-
