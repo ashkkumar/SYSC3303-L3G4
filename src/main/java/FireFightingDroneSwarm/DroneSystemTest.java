@@ -5,9 +5,13 @@ import FireFightingDroneSwarm.DroneSubsystem.Drone;
 import FireFightingDroneSwarm.FireIncidentSubsystem.FireEvent;
 import FireFightingDroneSwarm.FireIncidentSubsystem.IncidentReporter;
 import FireFightingDroneSwarm.FireIncidentSubsystem.InputReader;
+import FireFightingDroneSwarm.FireIncidentSubsystem.Zone;
 import FireFightingDroneSwarm.Scheduler.Scheduler;
 
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Main system test class. Instantiate Scheduler, IncidentReporter,
@@ -24,6 +28,10 @@ public class DroneSystemTest {
         Scheduler scheduler = new Scheduler(10);
         InputReader inputReader =
                 new InputReader("sample_event_file.csv", "sample_zone_file.csv");
+
+        ArrayList<Zone> zones = inputReader.parseZoneFile();
+        scheduler.setZoneIDs(buildZoneMap(zones));
+
         IncidentReporter incidentReporter = new IncidentReporter(inputReader, scheduler);
         Drone drone = new Drone(1, scheduler);
         scheduler.setDrone(drone);
@@ -52,6 +60,9 @@ public class DroneSystemTest {
                 new InputReader("sample_event_multiple.csv",
                         "sample_zone_multiple.csv");
 
+        ArrayList<Zone> zones = inputReader.parseZoneFile();
+        scheduler.setZoneIDs(buildZoneMap(zones));
+
         IncidentReporter incidentReporter = new IncidentReporter(inputReader, scheduler);
         Drone drone = new Drone(1, scheduler);
 
@@ -71,5 +82,14 @@ public class DroneSystemTest {
         droneThread.join();
 
     }
+
+    private static Map<Integer, Zone> buildZoneMap(ArrayList<Zone> zones) {
+        Map<Integer, Zone> map = new HashMap<>();
+        for (Zone z : zones) {
+            map.put(z.getID(), z);
+        }
+        return map;
+    }
+
 
 }

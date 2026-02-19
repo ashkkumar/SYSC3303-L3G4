@@ -1,6 +1,7 @@
 package FireFightingDroneSwarm.DroneSubsystem;
 import FireFightingDroneSwarm.FireIncidentSubsystem.FireEvent;
 import FireFightingDroneSwarm.FireIncidentSubsystem.Severity;
+import FireFightingDroneSwarm.FireIncidentSubsystem.Zone;
 import FireFightingDroneSwarm.Scheduler.Scheduler;
 
 public class Drone implements Runnable {
@@ -9,7 +10,20 @@ public class Drone implements Runnable {
     private volatile DroneStatus status;
     public FireEvent currentTask;
     private final Scheduler scheduler;
-    private static final double DRONE_SPEED = 20.0; // units per second (Iteration 0)
+    private static final double DRONE_SPEED = 80.0; // units per second (Iteration 0)
+
+    // Drone position (start at base)
+    private double posX;
+    private double posY;
+
+    // Base position (choose whatever your sim assumes; often 0,0)
+    private static final double BASE_X = 0;
+    private static final double BASE_Y = 0;
+
+    // target location
+    private double targetX;
+    private double targetY;
+
 
     /**
      * Creates a Drone object
@@ -20,6 +34,8 @@ public class Drone implements Runnable {
         this.droneId = droneId;
         this.scheduler = scheduler;
         this.status = DroneStatus.IDLE;
+        this.posX = BASE_X;
+        this.posY = BASE_Y;
     }
 
     /**
@@ -48,28 +64,62 @@ public class Drone implements Runnable {
         System.out.println("[Drone " + droneId + "] Dispatched to zone "
                 + currentTask.getZoneID());
 
-        status = DroneStatus.IN_FLIGHT;
-        travel();
+        // needa sort this out
 
-        status = DroneStatus.EXTINGUISHING;
+        double[] xy = scheduler.getZoneCenter(currentTask.getZoneID());
+        this.targetX = xy[0];
+        this.targetY = xy[1];
+
+        transition(DroneStatus.EN_ROUTE);
+        travelTo(targetX, targetY);
+
+        transition(DroneStatus.ARRIVED);
+
+        transition(DroneStatus.DROPPING_AGENT);
         extinguish(currentTask.getSeverity());
 
-        status = DroneStatus.RETURNING;
-        returnToBase();
+        transition(DroneStatus.RETURNING);
+        travelTo(BASE_X, BASE_Y);
 
-        status = DroneStatus.IDLE;
+        transition(DroneStatus.REFILLING);
+        refill();
+
+        transition(DroneStatus.IDLE);
         System.out.println("[Drone " + droneId + "] returned to base");
     }
 
     /**
-     * Travel time to the fire location.
+     * Validates if the new status is a valid transiton
+     * @param newStatus The new state of the drone
      */
-    private void travel() {
-        // gotta use a calc (short for calculator btw) for some real values
-        double distance = calculateDistanceToZone(currentTask.getZoneID());
-        long travelTimeMs = (long) ((distance / DRONE_SPEED) * 1000);
+    private synchronized void transition(DroneStatus newStatus) {
+        System.out.println("[Drone " + droneId + " " + status + "] Transitioning to " + newStatus);
 
-        sleep((int) travelTimeMs);
+        // we wanna check that the transition is valid, no illegal moves
+        // IDLE - > EN_ROUTE -> ARRIVED -> DROPPING_AGENT -> EN_ROUTE or RETURNING -> REFILLING -> IDLE
+        switch (status){
+            case IDLE:
+                if (newStatus != DroneStatus.EN_ROUTE) return;
+                break;
+            case EN_ROUTE:
+                if  (newStatus != DroneStatus.ARRIVED) return;
+                break;
+            case ARRIVED:
+                if (newStatus != DroneStatus.DROPPING_AGENT) return;
+                break;
+            case DROPPING_AGENT:
+                if (newStatus != DroneStatus.RETURNING &&
+                    newStatus != DroneStatus.EN_ROUTE) return;
+                break;
+            case RETURNING:
+                if (newStatus != DroneStatus.REFILLING) return;
+                break;
+            case REFILLING:
+                if (newStatus != DroneStatus.IDLE) return;
+                break;
+        }
+        status = newStatus;
+
     }
 
     /**
@@ -81,10 +131,10 @@ public class Drone implements Runnable {
 
         // need a calc
         switch (severity) {
-            case LOW -> extinguishTime = 1;
-            case MODERATE -> extinguishTime = 2;
-            case HIGH -> extinguishTime = 3;
-            default -> extinguishTime = 4;
+            case LOW -> extinguishTime = 1000;
+            case MODERATE -> extinguishTime = 2000;
+            case HIGH -> extinguishTime = 3500;
+            default -> extinguishTime = 1500;
         }
 
         sleep(extinguishTime);
@@ -93,17 +143,35 @@ public class Drone implements Runnable {
     /**
      * Simulates the return flight after task completion.
      */
-    private void returnToBase() {
+    private void travelTo(double x, double y) {
+        double distance =  calculateDistanceToZone(x, y);
 
-        double distance = calculateDistanceToZone(currentTask.getZoneID());
-        long returnTimeMs = (long) ((distance / DRONE_SPEED) * 1000);
-
-        sleep((int) returnTimeMs);
+        long travelTimeMs = (long) ((distance / DRONE_SPEED) * 1000);
+        sleep((int) travelTimeMs);
     }
 
-    private double calculateDistanceToZone(int zoneID) {
-        // add in a proper distance calc based on coords
-        return zoneID * 10.0;  // simple distance model
+    /**
+     * simulates refilling time (2 second)
+     */
+    private void refill() {
+        sleep(2000);
+    }
+
+    /**
+     * Calculates the travel distance to coordinates x, y
+     * @param x the x coordinate
+     * @param y the y coordinate
+     * @return the distance to be travelled
+     */
+    private double calculateDistanceToZone(double x, double y) {
+
+        double dx =  x - posX;
+        double dy = y - posY;
+
+        posX = x;
+        posY = y;
+
+        return Math.sqrt(dx * dx + dy * dy);  // simple distance model
     }
 
     /**
