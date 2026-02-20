@@ -16,6 +16,9 @@ public class Drone implements Runnable {
     private double posX;
     private double posY;
 
+    //Drone zone
+    private int zone;
+
     // Base position (choose whatever your sim assumes; often 0,0)
     private static final double BASE_X = 0;
     private static final double BASE_Y = 0;
@@ -36,6 +39,7 @@ public class Drone implements Runnable {
         this.status = DroneStatus.IDLE;
         this.posX = BASE_X;
         this.posY = BASE_Y;
+        this.zone = 0;
     }
 
     /**
@@ -86,6 +90,8 @@ public class Drone implements Runnable {
 
         transition(DroneStatus.IDLE);
         System.out.println("[Drone " + droneId + "] returned to base");
+
+        // zone = currentTask.getZoneID(); for when we implement refilling, if the tank isn't full it will stay and go to idle
     }
 
     /**
