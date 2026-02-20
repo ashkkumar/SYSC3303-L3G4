@@ -1,7 +1,6 @@
 package FireFightingDroneSwarm.DroneSubsystem;
 import FireFightingDroneSwarm.FireIncidentSubsystem.FireEvent;
 import FireFightingDroneSwarm.FireIncidentSubsystem.Severity;
-import FireFightingDroneSwarm.FireIncidentSubsystem.Zone;
 import FireFightingDroneSwarm.Scheduler.Scheduler;
 import FireFightingDroneSwarm.UserInterface.ZoneMapController;
 
@@ -12,6 +11,9 @@ public class Drone implements Runnable {
     public FireEvent currentTask;
     private final Scheduler scheduler;
     private static final double DRONE_SPEED = 80.0; // units per second (Iteration 0)
+    private int waterTank;
+    private static final int MAX_TANK = 100;
+    private boolean hasFuel = true;
 
     // Drone position (start at base)
     private double posX;
@@ -27,22 +29,24 @@ public class Drone implements Runnable {
     // target location
     private double targetX;
     private double targetY;
-    private ZoneMapController zoneMapController;
 
 
     /**
      * Creates a Drone object
-     * @param droneId ID to represent a drone object
-     * @param scheduler The Scheduler the drone communicates with
+     *
+     * @param droneId    ID to represent a drone object
+     * @param scheduler  The Scheduler the drone communicates with
+     * @param controller
      */
-    public Drone(int droneId, Scheduler scheduler, ZoneMapController zoneMapController) {
+    public Drone(int droneId, Scheduler scheduler, ZoneMapController controller) {
         this.droneId = droneId;
         this.scheduler = scheduler;
         this.status = DroneStatus.IDLE;
-        this.zoneMapController = zoneMapController;
         this.posX = BASE_X;
         this.posY = BASE_Y;
         this.zone = 0;
+        this.waterTank = MAX_TANK;
+        this.hasFuel = true;
     }
 
     /**
@@ -78,17 +82,29 @@ public class Drone implements Runnable {
         this.targetY = xy[1];
 
         transition(DroneStatus.EN_ROUTE);
-        zoneMapController.droneDispatched(currentTask.getZoneID());
         travelTo(targetX, targetY);
 
         transition(DroneStatus.ARRIVED);
         scheduler.notifyArrival(this.droneId);
 
         transition(DroneStatus.DROPPING_AGENT);
+        int amountUsed = calculateWaterUsage(currentTask.getSeverity());
+        this.waterTank -= amountUsed;
         extinguish(currentTask.getSeverity());
 
+        if(this.waterTank <= 0 || !remaining_flight()) {
+            System.out.println("[Drone " + droneId + "] Tank empty or low fuel. Returning.");
+            transition(DroneStatus.RETURNING);
+            travelTo(BASE_X, BASE_Y);
+            transition(DroneStatus.REFILLING);
+            refill();
+        }
+        else{
+            System.out.println("[Drone " + droneId + "] Remaining water: " + waterTank + ". Staying in field.");
+            transition(DroneStatus.IDLE);
+        }
+
         transition(DroneStatus.RETURNING);
-        zoneMapController.droneReturning(currentTask.getZoneID());
         travelTo(BASE_X, BASE_Y);
 
         transition(DroneStatus.REFILLING);
@@ -121,7 +137,7 @@ public class Drone implements Runnable {
                 break;
             case DROPPING_AGENT:
                 if (newStatus != DroneStatus.RETURNING &&
-                    newStatus != DroneStatus.EN_ROUTE) return;
+                        newStatus != DroneStatus.EN_ROUTE) return;
                 break;
             case RETURNING:
                 if (newStatus != DroneStatus.REFILLING) return;
@@ -132,6 +148,18 @@ public class Drone implements Runnable {
         }
         status = newStatus;
 
+    }
+
+    private int calculateWaterUsage(Severity severity) {
+        return switch (severity) {
+            case LOW -> 20;
+            case MODERATE -> 30;
+            case HIGH -> 50;
+        };
+    }
+
+    private boolean remaining_flight() {
+        return this.hasFuel;
     }
 
     /**
@@ -188,7 +216,7 @@ public class Drone implements Runnable {
 
     /**
      * Just had to put this here because I do the calculations yet mb
-     * actual times going to be based off one of the drones
+     * actual times gonna be based off one of the drones
      * @param ms duration to sleep in milliseconds
      */
     private void sleep(int ms) {
