@@ -18,7 +18,7 @@ public class IncidentReporter implements Runnable {
     private ArrayList<Zone> zones;
     private ArrayList<Long> timeBetweenEvents;
     private int nextEvent;
-    private final double TIME_SCALE = 0.2;
+    private final double TIME_SCALE = 0.05;
     private ZoneMapController zoneMapController;
 
     /**
@@ -27,20 +27,12 @@ public class IncidentReporter implements Runnable {
      * @param inputReader InputReader with file fields instantiated
      * @param scheduler Scheduler object for event sharing
      */
-    public IncidentReporter(InputReader inputReader, Scheduler scheduler) {
+    public IncidentReporter(InputReader inputReader, Scheduler scheduler, ZoneMapController zoneMapController) {
         this.inputReader = inputReader;
         this.scheduler = scheduler;
+        this.zoneMapController = zoneMapController;
         nextEvent = 0;
         this.initializeSystem();
-    }
-
-    /**
-     * Setter method to hook up this subsystem to the view controller in typical MVC fashion,
-     * anytime a fire is detected notify the controller. Likewise with extinguished events.
-     * @param controller
-     */
-    public void setController(ZoneMapController controller) {
-        this.zoneMapController = controller;
     }
 
     /**
@@ -64,11 +56,15 @@ public class IncidentReporter implements Runnable {
             for(int i  = 0; i < events.size() - 1; i++){
                 Duration durationBetween = Duration.between(events.get(i).getTimestamp(),
                         events.get(i+1).getTimestamp());
-                long seconds = durationBetween.getSeconds();
+                long seconds = durationBetween.getSeconds() * 1000;
                 timeBetweenEvents.add(seconds);
             }
 
             timeBetweenEvents.add(0L);
+
+            if(zoneMapController != null){
+                zoneMapController.initializeZones(zones);
+            }
 
         } catch (Exception e){
             e.printStackTrace();
@@ -86,11 +82,10 @@ public class IncidentReporter implements Runnable {
             FireEvent event = events.get(nextEvent);
             try {
                 scheduler.put(event);
-                Thread.sleep((long) (timeBetweenEvents.get(nextEvent) * TIME_SCALE));
-
                 if (zoneMapController != null) {
-                    zoneMapController.fireDetected(getZoneById(event.getZoneID()));
+                    zoneMapController.fireDetected(event.getZoneID());
                 }
+                Thread.sleep((long) (timeBetweenEvents.get(nextEvent) * TIME_SCALE));
 
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
@@ -109,30 +104,11 @@ public class IncidentReporter implements Runnable {
         System.out.println("[Incident Subsystem] recieved event confirmation " + event.toString());
     }
 
-    /**
-     *
-     * @param event
-     */
-    public void notifyFireExtinguished(FireEvent event){
-        if (zoneMapController != null) {
-            zoneMapController.fireExtinguished(getZoneById(event.getZoneID()));
-        }
-    }
 
     /**
-     *
-     * @param event
-     */
-    public void removeFireFromMap(FireEvent event){
-        if(zoneMapController != null){
-            zoneMapController.fireDetected(getZoneById(event.getZoneID()));
-        }
-    }
-
-    /**
-     *
-     * @param id
-     * @return
+     * Helper method to find object reference to Zone by id for controller methods
+     * @param id the id of the Zone object you wish to reference
+     * @return the Zone object that matches, null otherwise
      */
     private Zone getZoneById(int id) {
         for (Zone z : zones) {
@@ -142,7 +118,5 @@ public class IncidentReporter implements Runnable {
         }
         return null;
     }
-
-
 
 }

@@ -2,7 +2,8 @@ package FireFightingDroneSwarm.UserInterface;
 
 import FireFightingDroneSwarm.FireIncidentSubsystem.Zone;
 
-import javax.swing.SwingUtilities;
+import javax.swing.*;
+import java.util.ArrayList;
 
 public class ZoneMapController {
 
@@ -12,21 +13,23 @@ public class ZoneMapController {
         this.view = view;
     }
 
-    public void fireDetected(Zone zone) {
-        SwingUtilities.invokeLater(() ->
-                view.fireDetected(zone)
-        );
+    public void initializeZones(ArrayList<Zone> zones) {
+        SwingUtilities.invokeLater(() -> view.setupZones(zones));
     }
 
-    public void fireExtinguished(Zone zone) {
-        SwingUtilities.invokeLater(() ->
-                view.fireExtinguished(zone)
-        );
+    public void fireDetected(int zoneId) {
+        SwingUtilities.invokeLater(() -> view.fireDetected(zoneId));
     }
 
-    public void fireTimeElapsed(Zone zone) {
-        SwingUtilities.invokeLater(() ->
-                view.fireTimeElapsed(zone)
-        );
+    public void droneDispatched(int zoneId) {
+        SwingUtilities.invokeLater(() -> view.droneDispatched(zoneId));
+    }
+
+    public void droneExtinguishingFired(int zoneId) {
+        SwingUtilities.invokeLater(() -> view.droneReturning(zoneId));
+    }
+
+    public void droneReturning(int zoneId) {
+        SwingUtilities.invokeLater(() -> view.droneReturning(zoneId));
     }
 }
