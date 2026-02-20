@@ -3,6 +3,7 @@ import FireFightingDroneSwarm.FireIncidentSubsystem.FireEvent;
 import FireFightingDroneSwarm.FireIncidentSubsystem.Severity;
 import FireFightingDroneSwarm.FireIncidentSubsystem.Zone;
 import FireFightingDroneSwarm.Scheduler.Scheduler;
+import FireFightingDroneSwarm.UserInterface.ZoneMapController;
 
 public class Drone implements Runnable {
 
@@ -26,6 +27,7 @@ public class Drone implements Runnable {
     // target location
     private double targetX;
     private double targetY;
+    private ZoneMapController zoneMapController;
 
 
     /**
@@ -33,10 +35,11 @@ public class Drone implements Runnable {
      * @param droneId ID to represent a drone object
      * @param scheduler The Scheduler the drone communicates with
      */
-    public Drone(int droneId, Scheduler scheduler) {
+    public Drone(int droneId, Scheduler scheduler, ZoneMapController zoneMapController) {
         this.droneId = droneId;
         this.scheduler = scheduler;
         this.status = DroneStatus.IDLE;
+        this.zoneMapController = zoneMapController;
         this.posX = BASE_X;
         this.posY = BASE_Y;
         this.zone = 0;
@@ -75,6 +78,7 @@ public class Drone implements Runnable {
         this.targetY = xy[1];
 
         transition(DroneStatus.EN_ROUTE);
+        zoneMapController.droneDispatched(currentTask.getZoneID());
         travelTo(targetX, targetY);
 
         transition(DroneStatus.ARRIVED);
@@ -84,6 +88,7 @@ public class Drone implements Runnable {
         extinguish(currentTask.getSeverity());
 
         transition(DroneStatus.RETURNING);
+        zoneMapController.droneReturning(currentTask.getZoneID());
         travelTo(BASE_X, BASE_Y);
 
         transition(DroneStatus.REFILLING);
@@ -183,7 +188,7 @@ public class Drone implements Runnable {
 
     /**
      * Just had to put this here because I do the calculations yet mb
-     * actual times gonna be based off one of the drones
+     * actual times going to be based off one of the drones
      * @param ms duration to sleep in milliseconds
      */
     private void sleep(int ms) {

@@ -7,6 +7,8 @@ import FireFightingDroneSwarm.FireIncidentSubsystem.IncidentReporter;
 import FireFightingDroneSwarm.FireIncidentSubsystem.InputReader;
 import FireFightingDroneSwarm.FireIncidentSubsystem.Zone;
 import FireFightingDroneSwarm.Scheduler.Scheduler;
+import FireFightingDroneSwarm.UserInterface.ZoneMapController;
+import FireFightingDroneSwarm.UserInterface.ZoneMapView;
 
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -19,41 +21,14 @@ import java.util.Map;
  */
 public class DroneSystemTest {
     public static void main(String[] args) throws InterruptedException {
-        singleIncident();
         multipleIncidents();
-    }
-
-    public static void singleIncident() throws InterruptedException {
-        System.out.println("=== Starting Iteration 1 System Test ===");
-        Scheduler scheduler = new Scheduler(10);
-        InputReader inputReader =
-                new InputReader("sample_event_file.csv", "sample_zone_file.csv");
-
-        ArrayList<Zone> zones = inputReader.parseZoneFile();
-        scheduler.setZoneIDs(buildZoneMap(zones));
-
-        IncidentReporter incidentReporter = new IncidentReporter(inputReader, scheduler);
-        Drone drone = new Drone(1, scheduler);
-        scheduler.setDrone(drone);
-        scheduler.setIncidentReporter(incidentReporter);
-
-        Thread schedulerThread = new Thread(scheduler);
-        Thread incidentThread = new Thread(incidentReporter);
-        Thread droneThread = new Thread(drone);
-
-        schedulerThread.start();
-        incidentThread.start();
-        droneThread.start();
-
-        schedulerThread.join();
-        incidentThread.join();
-        droneThread.join();
-
     }
 
     public static void multipleIncidents() throws InterruptedException {
         System.out.println("\n=== Starting Iteration 1 System Test: Multiple Incidents ===");
 
+        ZoneMapView GUI = new ZoneMapView();
+        ZoneMapController controller = new ZoneMapController(GUI);
         Scheduler scheduler = new Scheduler(15);
 
         InputReader inputReader =
@@ -63,8 +38,9 @@ public class DroneSystemTest {
         ArrayList<Zone> zones = inputReader.parseZoneFile();
         scheduler.setZoneIDs(buildZoneMap(zones));
 
-        IncidentReporter incidentReporter = new IncidentReporter(inputReader, scheduler);
-        Drone drone = new Drone(1, scheduler);
+        IncidentReporter incidentReporter = new IncidentReporter(inputReader, scheduler, controller);
+
+        Drone drone = new Drone(1, scheduler, controller);
 
         scheduler.setDrone(drone);
         scheduler.setIncidentReporter(incidentReporter);
