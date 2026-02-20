@@ -12,6 +12,9 @@ public class Drone implements Runnable {
     public FireEvent currentTask;
     private final Scheduler scheduler;
     private static final double DRONE_SPEED = 80.0; // units per second (Iteration 0)
+    private int waterTank;
+    private static final int MAX_TANK = 100;
+    private boolean hasFuel = true;
 
     // Drone position (start at base)
     private double posX;
@@ -31,9 +34,9 @@ public class Drone implements Runnable {
 
 
     /**
-     * Creates a Drone object
-     * @param droneId ID to represent a drone object
-     * @param scheduler The Scheduler the drone communicates with
+     * @param droneId    ID to represent a drone object
+     * @param scheduler  The Scheduler the drone communicates with
+     * @param zoneMapController
      */
     public Drone(int droneId, Scheduler scheduler, ZoneMapController zoneMapController) {
         this.droneId = droneId;
@@ -43,6 +46,8 @@ public class Drone implements Runnable {
         this.posX = BASE_X;
         this.posY = BASE_Y;
         this.zone = 0;
+        this.waterTank = MAX_TANK;
+        this.hasFuel = true;
     }
 
     /**
@@ -85,7 +90,21 @@ public class Drone implements Runnable {
         scheduler.notifyArrival(this.droneId);
 
         transition(DroneStatus.DROPPING_AGENT);
+        int amountUsed = calculateWaterUsage(currentTask.getSeverity());
+        this.waterTank -= amountUsed;
         extinguish(currentTask.getSeverity());
+
+        if(this.waterTank <= 0 || !remaining_flight()) {
+            System.out.println("[Drone " + droneId + "] Tank empty or low fuel. Returning.");
+            transition(DroneStatus.RETURNING);
+            travelTo(BASE_X, BASE_Y);
+            transition(DroneStatus.REFILLING);
+            refill();
+        }
+        else{
+            System.out.println("[Drone " + droneId + "] Remaining water: " + waterTank + ". Staying in field.");
+            transition(DroneStatus.IDLE);
+        }
 
         transition(DroneStatus.RETURNING);
         zoneMapController.droneReturning(currentTask.getZoneID());
@@ -121,7 +140,7 @@ public class Drone implements Runnable {
                 break;
             case DROPPING_AGENT:
                 if (newStatus != DroneStatus.RETURNING &&
-                    newStatus != DroneStatus.EN_ROUTE) return;
+                        newStatus != DroneStatus.EN_ROUTE) return;
                 break;
             case RETURNING:
                 if (newStatus != DroneStatus.REFILLING) return;
@@ -167,6 +186,27 @@ public class Drone implements Runnable {
      */
     private void refill() {
         sleep(2000);
+    }
+
+    /**
+     * Determines the amount of water/agent to dispense based on the fire's severity.
+     * @param severity The severity level of the fire event.
+     * @return The integer amount of water units to be used.
+     */
+    private int calculateWaterUsage(Severity severity) {
+        return switch (severity) {
+            case LOW -> 20;
+            case MODERATE -> 30;
+            case HIGH -> 50;
+        };
+    }
+
+    /**
+     * Checks if the drone has enough flight capability (fuel) to continue operating.
+     * @return true if the drone has sufficient fuel, false if it must return to base.
+     */
+    private boolean remaining_flight() {
+        return this.hasFuel;
     }
 
     /**
