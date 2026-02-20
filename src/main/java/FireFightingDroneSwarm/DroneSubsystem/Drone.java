@@ -1,6 +1,7 @@
 package FireFightingDroneSwarm.DroneSubsystem;
 import FireFightingDroneSwarm.FireIncidentSubsystem.FireEvent;
 import FireFightingDroneSwarm.FireIncidentSubsystem.Severity;
+import FireFightingDroneSwarm.FireIncidentSubsystem.Zone;
 import FireFightingDroneSwarm.Scheduler.Scheduler;
 import FireFightingDroneSwarm.UserInterface.ZoneMapController;
 
@@ -29,19 +30,19 @@ public class Drone implements Runnable {
     // target location
     private double targetX;
     private double targetY;
+    private ZoneMapController zoneMapController;
 
 
     /**
-     * Creates a Drone object
-     *
      * @param droneId    ID to represent a drone object
      * @param scheduler  The Scheduler the drone communicates with
-     * @param controller
+     * @param zoneMapController
      */
-    public Drone(int droneId, Scheduler scheduler, ZoneMapController controller) {
+    public Drone(int droneId, Scheduler scheduler, ZoneMapController zoneMapController) {
         this.droneId = droneId;
         this.scheduler = scheduler;
         this.status = DroneStatus.IDLE;
+        this.zoneMapController = zoneMapController;
         this.posX = BASE_X;
         this.posY = BASE_Y;
         this.zone = 0;
@@ -82,6 +83,7 @@ public class Drone implements Runnable {
         this.targetY = xy[1];
 
         transition(DroneStatus.EN_ROUTE);
+        zoneMapController.droneDispatched(currentTask.getZoneID());
         travelTo(targetX, targetY);
 
         transition(DroneStatus.ARRIVED);
@@ -105,6 +107,7 @@ public class Drone implements Runnable {
         }
 
         transition(DroneStatus.RETURNING);
+        zoneMapController.droneReturning(currentTask.getZoneID());
         travelTo(BASE_X, BASE_Y);
 
         transition(DroneStatus.REFILLING);
@@ -150,18 +153,6 @@ public class Drone implements Runnable {
 
     }
 
-    private int calculateWaterUsage(Severity severity) {
-        return switch (severity) {
-            case LOW -> 20;
-            case MODERATE -> 30;
-            case HIGH -> 50;
-        };
-    }
-
-    private boolean remaining_flight() {
-        return this.hasFuel;
-    }
-
     /**
      * Simulates fire extinguishing time based on fire severity.
      * @param severity the severity level of the fire
@@ -198,6 +189,27 @@ public class Drone implements Runnable {
     }
 
     /**
+     * Determines the amount of water/agent to dispense based on the fire's severity.
+     * @param severity The severity level of the fire event.
+     * @return The integer amount of water units to be used.
+     */
+    private int calculateWaterUsage(Severity severity) {
+        return switch (severity) {
+            case LOW -> 20;
+            case MODERATE -> 30;
+            case HIGH -> 50;
+        };
+    }
+
+    /**
+     * Checks if the drone has enough flight capability (fuel) to continue operating.
+     * @return true if the drone has sufficient fuel, false if it must return to base.
+     */
+    private boolean remaining_flight() {
+        return this.hasFuel;
+    }
+
+    /**
      * Calculates the travel distance to coordinates x, y
      * @param x the x coordinate
      * @param y the y coordinate
@@ -216,7 +228,7 @@ public class Drone implements Runnable {
 
     /**
      * Just had to put this here because I do the calculations yet mb
-     * actual times gonna be based off one of the drones
+     * actual times going to be based off one of the drones
      * @param ms duration to sleep in milliseconds
      */
     private void sleep(int ms) {
