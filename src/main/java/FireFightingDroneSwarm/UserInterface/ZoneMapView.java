@@ -226,6 +226,10 @@ public class ZoneMapView {
 
         private Timer animationTimer;
 
+        /***
+         * Starts a timer to repaint the GUI every 30 ms, does some processing of the active drones
+         * and the extinguished fires to repaint the screen.
+         */
         public ZoneMapPanel() {
 
             animationTimer = new Timer(30, e -> {
@@ -267,6 +271,11 @@ public class ZoneMapView {
             animationTimer.start();
         }
 
+        /**
+         * Helper class to create an animation from a Drone, with
+         * state and progress to track how far it is from its return
+         * or destination.
+         */
         private static class DroneAnimation {
 
             enum State {
@@ -312,6 +321,12 @@ public class ZoneMapView {
             }
         }
 
+        /**
+         * Override method of the default paint method in order to
+         * add grid lines and zone markers - makes it easier to animate the panel flexibly, no
+         * real workaround for this.
+         * @param g Graphics object to use for painting this JPanel.
+         */
         @Override
         protected void paintComponent(Graphics g) {
             super.paintComponent(g);
@@ -337,12 +352,14 @@ public class ZoneMapView {
                 Rectangle rect = rectangles.get(i);
                 Zone zone = zones.get(i);
 
+                // Paint each zone and its borders
                 g2.setColor(Color.BLUE);
                 g2.drawRect(rect.x, rect.y, rect.width, rect.height);
 
                 g2.setColor(Color.BLACK);
                 g2.drawString("Zone " + zone.getID(), rect.x + 5, rect.y + 20);
 
+                // Paint the fire in this zone
                 if (activeFires.contains(zone.getID())) {
                     g2.setColor(Color.RED);
                     g2.fillRect(
@@ -353,6 +370,7 @@ public class ZoneMapView {
                     );
                 }
 
+                // Change fire colour to green if moved to extinguished fires
                 if (extinguishedFires.contains(zone.getID())) {
                     g2.setColor(new Color(80, 150, 70));
                     g2.fillRect(
@@ -364,6 +382,7 @@ public class ZoneMapView {
                 }
             }
 
+            // Draw all of the active drones and their current positions
             for (DroneAnimation drone : drones) {
                 drawDrone(g2, drone);
             }
