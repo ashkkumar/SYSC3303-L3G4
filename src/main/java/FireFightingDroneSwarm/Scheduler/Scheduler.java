@@ -3,6 +3,7 @@ package FireFightingDroneSwarm.Scheduler;
 import FireFightingDroneSwarm.DroneSubsystem.Drone;
 import FireFightingDroneSwarm.FireIncidentSubsystem.FireEvent;
 import FireFightingDroneSwarm.FireIncidentSubsystem.IncidentReporter;
+import FireFightingDroneSwarm.FireIncidentSubsystem.Severity;
 import FireFightingDroneSwarm.FireIncidentSubsystem.Zone;
 
 import java.util.ArrayDeque;
@@ -93,7 +94,7 @@ public class Scheduler implements Runnable {
             return null;
         }
 
-        FireEvent fireEvent = buffer.remove();
+        FireEvent fireEvent = assignDroneEvent();
         if(this.getAllTasksSent() && buffer.isEmpty()) {
             this.allTasksProcessed = true;
         }
@@ -138,6 +139,62 @@ public class Scheduler implements Runnable {
     }
 
     /**
+     * Algorithm for assigning a drone the appropriate event
+     * Based on Weighted pathfinding, each event is given a score based on distance and severity
+     * @return Event with the highest score i
+     *
+     */
+    public synchronized FireEvent assignDroneEvent() {
+        double max = 0;
+        FireEvent highestScore = buffer.peek();
+        for (FireEvent event: buffer) {
+            double zoneScore = calculateZoneDistance(event.getZoneID(), 0); // for now but later on will be the distance from the target zone to drones current zone when refill is implimented
+            double severityScore = 0;
+            Severity severity = event.getSeverity();
+            if (severity.equals(Severity.LOW)) {severityScore = 1;}
+            if (severity.equals(Severity.MODERATE)) {severityScore = 5;}
+            if (severity.equals(Severity.HIGH)) {severityScore = 20;}
+
+            double totalScore = severityScore / zoneScore;
+            if (totalScore > max) {
+                highestScore = event;
+                max = totalScore;
+            }
+        }
+        buffer.remove(highestScore);
+        return highestScore;
+
+    }
+
+    /**
+     * Returns the distancce betweens 2 zones
+     * @param zone1 center of the first zone
+     * @param zone2 center of the second zone
+     * @return double distance between the zones
+     */
+    public synchronized double calculateZoneDistance(int zone1, int zone2) {
+        double dx = 0;
+        double dy = 0;
+        // drone is at base
+        if (zone2 == 0) {
+            double[] zone1Distance = getZoneCenter(zone1);
+            dx = 0 - zone1Distance[0];
+            dy = 0 - zone1Distance[1];
+
+        } else {
+            double[] zone1Distance = getZoneCenter(zone1);
+            double[] zone2Distance = getZoneCenter(zone2);
+            dx = zone2Distance[0] - zone1Distance[0];
+            dy = zone2Distance[1] - zone1Distance[1];
+        }
+
+
+        return Math.sqrt(dx * dx + dy * dy);
+
+
+    }
+
+    /**
      * Finds the start and end coordinates from the zone
      * @param zoneId the zone's ID
      * @return double[] with the coordinates
@@ -150,6 +207,15 @@ public class Scheduler implements Runnable {
         int[] s = z.getStartCoordinates();
         int[] e = z.getEndCoordinates();
         return new double[]{ (s[0] + e[0]) / 2.0, (s[1] + e[1]) / 2.0 };
+    }
+
+    /**
+     * Notifies the scheduler that the drone has reached the fire zone.
+     * This satisfies the Iteration 2 requirement for arrival notification.
+     */
+    public synchronized void notifyArrival(int droneId) {
+        System.out.println("[SCHEDULER] Drone " + droneId + " has arrived at the zone.");
+        notifyAll();
     }
 
     /**
