@@ -1,6 +1,9 @@
 package FireFightingDroneSwarm.FireIncidentSubsystem;
 
 import FireFightingDroneSwarm.Scheduler.Scheduler;
+import FireFightingDroneSwarm.UserInterface.ZoneMapController;
+
+import java.time.Duration;
 import java.util.ArrayList;
 
 /**
@@ -13,7 +16,10 @@ public class IncidentReporter implements Runnable {
     private Scheduler scheduler;
     private ArrayList<FireEvent> events;
     private ArrayList<Zone> zones;
+    private ArrayList<Long> timeBetweenEvents;
     private int nextEvent;
+    private final double TIME_SCALE = 0.2;
+    private ZoneMapController zoneMapController;
 
     /**
      * Constructor for this object, takes in an instantiated InputReader
@@ -29,6 +35,15 @@ public class IncidentReporter implements Runnable {
     }
 
     /**
+     * Setter method to hook up this subsystem to the view controller in typical MVC fashion,
+     * anytime a fire is detected notify the controller. Likewise with extinguished events.
+     * @param controller
+     */
+    public void setController(ZoneMapController controller) {
+        this.zoneMapController = controller;
+    }
+
+    /**
      * This function initializes the zones, and
      * events specific to this incident subsystem.
      */
@@ -36,6 +51,7 @@ public class IncidentReporter implements Runnable {
         try{
             events = inputReader.parseEventFile();
             zones = inputReader.parseZoneFile();
+            timeBetweenEvents = new ArrayList<>();
 
             for(Zone z : zones){
                 System.out.println(z.toString());
@@ -44,6 +60,15 @@ public class IncidentReporter implements Runnable {
             for(FireEvent e : events){
                 System.out.println(e.toString());
             }
+
+            for(int i  = 0; i < events.size() - 1; i++){
+                Duration durationBetween = Duration.between(events.get(i).getTimestamp(),
+                        events.get(i+1).getTimestamp());
+                long seconds = durationBetween.getSeconds();
+                timeBetweenEvents.add(seconds);
+            }
+
+            timeBetweenEvents.add(0L);
 
         } catch (Exception e){
             e.printStackTrace();
@@ -61,6 +86,12 @@ public class IncidentReporter implements Runnable {
             FireEvent event = events.get(nextEvent);
             try {
                 scheduler.put(event);
+                Thread.sleep((long) (timeBetweenEvents.get(nextEvent) * TIME_SCALE));
+
+                if (zoneMapController != null) {
+                    zoneMapController.fireDetected(getZoneById(event.getZoneID()));
+                }
+
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
@@ -77,5 +108,41 @@ public class IncidentReporter implements Runnable {
     public void getEventConfirmation(FireEvent event){
         System.out.println("[Incident Subsystem] recieved event confirmation " + event.toString());
     }
+
+    /**
+     *
+     * @param event
+     */
+    public void notifyFireExtinguished(FireEvent event){
+        if (zoneMapController != null) {
+            zoneMapController.fireExtinguished(getZoneById(event.getZoneID()));
+        }
+    }
+
+    /**
+     *
+     * @param event
+     */
+    public void removeFireFromMap(FireEvent event){
+        if(zoneMapController != null){
+            zoneMapController.fireDetected(getZoneById(event.getZoneID()));
+        }
+    }
+
+    /**
+     *
+     * @param id
+     * @return
+     */
+    private Zone getZoneById(int id) {
+        for (Zone z : zones) {
+            if (z.getID() == id) {
+                return z;
+            }
+        }
+        return null;
+    }
+
+
 
 }

@@ -8,7 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.ArrayList;
 
-public class ZoneDisplay {
+public class ZoneMapView {
 
     private final Map<Integer, Integer> zoneLengths;
     private final Map<Integer, Integer> zoneHeights;
@@ -21,7 +21,7 @@ public class ZoneDisplay {
 
     private ZoneMapPanel zoneMap;
 
-    public ZoneDisplay(){
+    public ZoneMapView(){
         zoneLengths = new HashMap<>();
         zoneHeights = new HashMap<>();
     }
@@ -151,16 +151,22 @@ public class ZoneDisplay {
         zoneMap.addZone(rect, zone);
     }
 
-    public void fireDetected(Zone zone){ // Refactor to send ID?
-        zoneMap.fireDetected(zone);
+    public void fireDetected(Zone zone) {
+        if (zoneMap != null) {
+            zoneMap.fireDetected(zone);
+        }
     }
 
-    public void fireExtinguished(Zone zone){
-        zoneMap.fireExtinguished(zone);
+    public void fireExtinguished(Zone zone) {
+        if (zoneMap != null) {
+            zoneMap.fireExtinguished(zone);
+        }
     }
 
-    public void fireTimeElapsed(Zone zone){
-        zoneMap.fireTimeElapsed(zone);
+    public void fireTimeElapsed(Zone zone) {
+        if (zoneMap != null) {
+            zoneMap.fireTimeElapsed(zone);
+        }
     }
 
     static class ZoneMapPanel extends JPanel {
@@ -232,7 +238,7 @@ public class ZoneDisplay {
 
     public static void main(String[] args){
 
-        ZoneDisplay zoneDisplay = new ZoneDisplay();
+        ZoneMapView zoneDisplay = new ZoneMapView();
         zoneDisplay.buildUserInterface();
 
         int[] zoneOneStart = {0,0};
@@ -261,22 +267,11 @@ public class ZoneDisplay {
         zoneDisplay.calculateZone(zoneTwo);
         zoneDisplay.calculateZone(zoneThree);
         zoneDisplay.calculateZone(zoneFour);
-        zoneDisplay.fireDetected(zoneOne);
 
-        try{
-            Thread.sleep(200);
-        } catch (Exception e){
-            e.printStackTrace();
-        }
+        //zoneDisplay.fireDetected(zoneOne);
 
-        zoneDisplay.fireExtinguished(zoneOne);
+        //zoneDisplay.fireExtinguished(zoneOne);
 
-        try{
-            Thread.sleep(200);
-        } catch (Exception e){
-            e.printStackTrace();
-        }
-
-        zoneDisplay.fireTimeElapsed(zoneOne);
+        //zoneDisplay.fireTimeElapsed(zoneOne);
     }
 }
