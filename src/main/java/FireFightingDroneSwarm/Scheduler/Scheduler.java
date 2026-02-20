@@ -153,6 +153,15 @@ public class Scheduler implements Runnable {
     }
 
     /**
+     * Notifies the scheduler that the drone has reached the fire zone.
+     * This satisfies the Iteration 2 requirement for arrival notification.
+     */
+    public synchronized void notifyArrival(int droneId) {
+        System.out.println("[SCHEDULER] Drone " + droneId + " has arrived at the zone.");
+        notifyAll();
+    }
+
+    /**
      * Scheduler's implementation of run, do nothing in this
      * iteration - just a communication channel until all tasks complete
      */

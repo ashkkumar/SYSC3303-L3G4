@@ -74,6 +74,7 @@ public class Drone implements Runnable {
         travelTo(targetX, targetY);
 
         transition(DroneStatus.ARRIVED);
+        scheduler.notifyArrival(this.droneId);
 
         transition(DroneStatus.DROPPING_AGENT);
         extinguish(currentTask.getSeverity());
