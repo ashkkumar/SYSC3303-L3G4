@@ -23,7 +23,7 @@ The project emphasizes:
 #### Drone Subsystem (`DroneSubsystem`)
 
 - `Drone` – Active thread representing a drone  
-- `DroneStatus` – Enum representing drone states (IDLE, IN_FLIGHT, etc.)
+- `DroneStatus` – Enum representing drone states (IDLE, EN_ROUTE, REFILLING, etc)
 
 #### Fire Incident Subsystem (`FireIncidentSubsystem`)
 - `FireEvent` – Represents a fire incident  
@@ -39,6 +39,8 @@ The project emphasizes:
 - Receives task completion confirmations  
 
 #### User Interface (`UserInterface`)
+- `ZoneMapController` - Controller for the view
+- `ZoneMapView` - Java Swing view displaying drone dispatch
 - Swing-based graphical interface  
 - Can be run independently from the simulation logic
 
@@ -67,21 +69,22 @@ Ensure the correct JDK (OpenJDK 21.0.8) is selected
 Using Maven:
 mvn clean compile
 Or build directly through your IDE.
-3. Run the Simulation (Iteration 1)
+3. Run the Simulation (Iteration 2)
 Navigate to: FireFightingDroneSwarm.DroneSystemTest Run the main() method
-Console output will display: Zone loading, Fire event parsing, Scheduler buffering, Drone dispatch and task completion
+Console output will display: Zone loading, Fire event parsing, Scheduler buffering, Drone dispatch and task completion and display a GUI to visually demonstrate the drones in flight completing tasks
 
 ## Testing
-System-level testing for Iteration 1 is performed through the DroneSystemTest.java class, running this file will execute the main() and perform the tests.
-Two test functions are used singleIncident() and multipleIncidents().
+System-level testing for Iteration 2 is performed through the DroneSystemTest.java class, running this file will execute the main() and perform the tests. This is in addition to individual junit testing classes.
+A single test function is used multipleIncidents() in DroneSystemTest.java.
 Multiple test scenarios are executed using different input CSV files to validate:
 - Subsystem communication
 - Task sequencing
 - Concurrent execution behavior
 - Note: Due to concurrency, console output may appear interleaved. This is expected.
+- Junit tests are available as well for the DroneSubsystem, FireIncidentSubsystem, and Scheduler. To execute these tests open the junit test file (for example DroneTest.java) in Intellij and click the execute button.
 
 ## Responsibility Breakdown
-- Ashwin Kumar – Drone Subsystem implementation and system testing
-- Maryam Manjra – Fire Incident Subsystem and sequence diagram
-- Jason Keah – Graphical User Interface and UML class diagram
-- Abhiram Sureshkumar – Scheduler subsystem implementation
+- Ashwin Kumar – Drone logic, State implementation, Junit tests, Sequence Diagram
+- Maryam Manjra – User interface update, ZoneMapController, ZoneMapView
+- Jason Keah – Scheduler update - scheduling logic
+- Abhiram Sureshkumar – Drone logic, UML Diagram, State Machine Diagram
