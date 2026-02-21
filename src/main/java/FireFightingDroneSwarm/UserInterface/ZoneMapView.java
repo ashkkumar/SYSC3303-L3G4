@@ -196,29 +196,55 @@ public class ZoneMapView {
         zoneMap.addZone(rect, zone);
     }
 
+    /**
+     * Wrapper around the ZoneMapPanel class method to avoid controller
+     * directly calling panel modifications. Triggers the
+     * illustration on the ZoneMapPanel of a fire.
+     * @param zoneId id of zone where fire is detected.
+     */
     public void fireDetected(int zoneId) {
         if (zoneMap != null) {
             zoneMap.fireDetected(zoneId);
         }
     }
 
+
+    /**
+     * Wrapper around the ZoneMapPanel class method to avoid controller
+     * directly calling panel modifications. Triggers the illustration of
+     * a drone departing to the specified zone.
+     * @param zoneId id of zone where drone is travelling to.
+     */
     public void droneDispatched(int zoneId) {
         if (zoneMap != null) {
             zoneMap.droneDispatched(zoneId);
         }
     }
 
+    /**
+     * Wrapper around the ZoneMapPanel class method to avoid controller
+     * directly calling panel modifications. Triggers the illustration of
+     * a drone returning to its base station.
+     * @param zoneId id of zone where drone is returning from.
+     */
     public void droneReturning(int zoneId) {
         if (zoneMap != null) {
             zoneMap.droneReturning(zoneId);
         }
     }
 
+    /**
+     * This class represents the GUI element consisting of the zones and
+     * the drone illustrations. As this zone is the only one that
+     * gets updated periodically, it is separated into its own class.
+     */
     static class ZoneMapPanel extends JPanel {
 
         private final List<Rectangle> rectangles = new ArrayList<>();
         private final List<Zone> zones = new ArrayList<>();
 
+        // These lists are used as a way to keep track of fires that need to be repainted or removed every
+        // timer update
         private final List<Integer> activeFires = new ArrayList<>();
         private final List<Integer> extinguishedFires = new ArrayList<>();
 
@@ -227,8 +253,8 @@ public class ZoneMapView {
         private Timer animationTimer;
 
         /***
-         * Starts a timer to repaint the GUI every 30 ms, does some processing of the active drones
-         * and the extinguished fires to repaint the screen.
+         * Starts a timer to repaint the GUI every 30 ms, executes some processing of the active drones
+         * and the extinguished fires to repaint the screen based on the state of the drone.
          */
         public ZoneMapPanel() {
 
@@ -237,7 +263,8 @@ public class ZoneMapView {
                 for (DroneAnimation drone : drones) {
 
                     switch (drone.state) {
-
+                        // If the drone has reached its destination, change its state to extinguishing, otherwise
+                        // continue towards goal
                         case GOING:
                             drone.progress += 0.005;
                             if (drone.progress >= 1.0) {
@@ -245,16 +272,18 @@ public class ZoneMapView {
                                 drone.state = DroneAnimation.State.EXTINGUISHING;
                             }
                             break;
-
+                        // If the drone is returning, decrement its progress (paints it closer to the base in the next loop)
                         case RETURNING:
                             drone.progress -= 0.005;
                             break;
-
+                        // If it is extinguishing, keep it where it is until updated by the controller
                         case EXTINGUISHING:
                             break;
                     }
                 }
 
+                // Check which drones have successfully returned to base and remove them from active
+                // elements on the frame
                 Iterator<DroneAnimation> iterator = drones.iterator();
                 while (iterator.hasNext()) {
                     DroneAnimation drone = iterator.next();
@@ -277,7 +306,7 @@ public class ZoneMapView {
          * or destination.
          */
         private static class DroneAnimation {
-
+            // Track state of the drone
             enum State {
                 GOING,
                 EXTINGUISHING,
@@ -285,24 +314,46 @@ public class ZoneMapView {
             }
 
             int zoneId;
+            // Use progress to update its location 0.0 means corner, and 1.0 means destination reached.
             double progress = 0.0;
             State state = State.GOING;
         }
 
+        /**
+         * Method to add a zone to the view by instantiating a rectangle to match on the JPanel.
+         * @param rect Rectangle object with size as scaled to the panel
+         * @param zone Zone object representing the Zone
+         */
         public void addZone(Rectangle rect, Zone zone) {
             rectangles.add(rect);
             zones.add(zone);
         }
 
+        /**
+         * Add the Zone in which the fire is detected to the list of active fires. This will
+         * automatically get updated in the next 30 ms increment when the panel is repainted.
+         * @param zoneId integer ID of the zone to paint a fire in.
+         */
         public void fireDetected(int zoneId) {
             activeFires.add(zoneId);
         }
 
+
+        /**
+         * Add the Zone in which the fire was detected to the list of extinguished fires (painted green). This will
+         * automatically get updated in the next 30 ms increment when the panel is repainted.
+         * @param zoneId integer ID of the zone to paint an extinguished fire in,
+         */
         public void fireExtinguished(int zoneId) {
             activeFires.remove((Integer) zoneId);
             extinguishedFires.add(zoneId);
         }
 
+        /**
+         * Create a new drone animation because a drone has been dispatched. Set its progress to 0.0
+         * so that it can be painted in the corner.
+         * @param zoneId integer ID of the zone the drone will eventually reach.
+         */
         public void droneDispatched(int zoneId) {
             DroneAnimation drone = new DroneAnimation();
             drone.zoneId = zoneId;
@@ -312,6 +363,11 @@ public class ZoneMapView {
             drones.add(drone);
         }
 
+        /**
+         * The drone has reached its destination, and extinguished the fire. Change its state to
+         * returning so that it can travel back to base.
+         * @param zoneId the integer ID of the zone from which the drone is returning.
+         */
         public void droneReturning(int zoneId) {
             for (DroneAnimation drone : drones) {
                 if (drone.zoneId == zoneId && drone.state == DroneAnimation.State.EXTINGUISHING) {
@@ -388,21 +444,33 @@ public class ZoneMapView {
             }
         }
 
+        /**
+         * This method handles painting the rectangle related to a drone on the screen
+         * It starts at a particular corner, measures an increment towards its destination
+         * and repaints the drone there.
+         * @param g2 the Graphics2D object used to paint the JPanel.
+         * @param drone the DroneAnimation for the drone that is being updated.
+         */
         private void drawDrone(Graphics2D g2, DroneAnimation drone) {
 
             for (int i = 0; i < zones.size(); i++) {
                 if (zones.get(i).getID() == drone.zoneId) {
-
+                    // Get the coordinates of the zone rectangle on the panel
                     Rectangle rect = rectangles.get(i);
 
+                    // Starting point of the drone
                     int cornerX = 0;
                     int cornerY = 0;
 
+                    // Destination of the drone
                     int centerX = (int) rect.getCenterX() + 5;
                     int centerY = (int) rect.getCenterY() + 5;
 
+                    // When progress is negative, don't move the drone or when progress is equal to 1, also don't move
+                    // the drone. Otherwise, use its progress value.
                     double p = Math.max(0, Math.min(drone.progress, 1));
 
+                    // New painting coordinates
                     int currentX = (int) (cornerX + p * (centerX - cornerX));
                     int currentY = (int) (cornerY + p * (centerY - cornerY));
 
@@ -418,8 +486,10 @@ public class ZoneMapView {
                             break;
                     }
 
+                    // Paint drone on the screen
                     g2.fillRect(currentX - 5, currentY - 5, 20, 20);
 
+                    // Add string label, use font metrics to find width and height of the font
                     String label = "D(" + drone.zoneId + ")"; //Needs to change to drone ID - need some link
                     Font font = new Font("SansSerif", Font.BOLD, 8);
                     g2.setFont(font);
