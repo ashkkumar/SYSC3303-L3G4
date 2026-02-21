@@ -72,7 +72,7 @@ public class Drone implements Runnable {
      * flight, extinguishing, and return
      * subject to change
      */
-    private void executeTask() {
+    void executeTask() {
         System.out.println("[Drone " + droneId + "] Dispatched to zone "
                 + currentTask.getZoneID());
 
@@ -83,7 +83,9 @@ public class Drone implements Runnable {
         this.targetY = xy[1];
 
         transition(DroneStatus.EN_ROUTE);
-        zoneMapController.droneDispatched(currentTask.getZoneID());
+        if (zoneMapController != null) {
+            zoneMapController.droneDispatched(currentTask.getZoneID());
+        }
         travelTo(targetX, targetY);
 
         transition(DroneStatus.ARRIVED);
@@ -107,7 +109,9 @@ public class Drone implements Runnable {
         }
 
         transition(DroneStatus.RETURNING);
-        zoneMapController.droneReturning(currentTask.getZoneID());
+        if (zoneMapController != null) {
+            zoneMapController.droneReturning(currentTask.getZoneID());
+        }
         travelTo(BASE_X, BASE_Y);
 
         transition(DroneStatus.REFILLING);
@@ -123,7 +127,7 @@ public class Drone implements Runnable {
      * Validates if the new status is a valid transiton
      * @param newStatus The new state of the drone
      */
-    private synchronized void transition(DroneStatus newStatus) {
+    synchronized void transition(DroneStatus newStatus) {
         System.out.println("[Drone " + droneId + " " + status + "] Transitioning to " + newStatus);
 
         // we wanna check that the transition is valid, no illegal moves
@@ -231,12 +235,31 @@ public class Drone implements Runnable {
      * actual times going to be based off one of the drones
      * @param ms duration to sleep in milliseconds
      */
-    private void sleep(int ms) {
+    protected void sleep(int ms) {
         try {
             Thread.sleep(ms);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
     }
+
+    /**
+     * Returns the X position of the drone
+     * @return double - x coordinate
+     */
+    public double getPosX() { return posX; }
+
+    /**
+     * Returns the Y position of the drone
+     * @return double - y coordinate
+     */
+    public double getPosY() { return posY; }
+
+    /**
+     * Returns the status of the drone
+     * @return the drone status DroneStatus.IDLE / EN_ROUTE etc
+     */
+    public DroneStatus getStatus() { return status; }
+    public int getWaterTank() { return waterTank; } // optional
 
 }

@@ -44,6 +44,11 @@ class SchedulerTest {
     void testBlockedZones() throws InterruptedException, ExecutionException, TimeoutException {
         Scheduler scheduler = new Scheduler(1);
 
+        Map<Integer, Zone> zones = new HashMap<>();
+        zones.put(1, new Zone(1, new int[]{0, 0}, new int[]{10, 10}));
+        zones.put(2, new Zone(2, new int[]{0, 0}, new int[]{20, 20}));
+        scheduler.setZoneIDs(zones);
+
         FireEvent e1 = new FireEvent(1, TaskType.FIRE_DETECTED, LocalTime.of(13, 0), Severity.LOW);
         FireEvent e2 = new FireEvent(2, TaskType.FIRE_DETECTED, LocalTime.of(13, 1), Severity.MODERATE);
 
@@ -81,6 +86,10 @@ class SchedulerTest {
     void TestGet() throws Exception {
         Scheduler scheduler = new Scheduler(5);
 
+        Map<Integer, Zone> zones = new HashMap<>();
+        zones.put(1, new Zone(1, new int[]{0, 0}, new int[]{10, 10}));
+        scheduler.setZoneIDs(zones);
+
         // Put one event so get() can actually remove it (and then see buffer empty)
         FireEvent e1 = new FireEvent(1, TaskType.FIRE_DETECTED, LocalTime.of(13, 0), Severity.LOW);
         scheduler.put(e1);
@@ -100,17 +109,90 @@ class SchedulerTest {
     }
 
     @Test
-    void setAllTasksSent_updatesFlag() {
+    void testSetAllTasksSentUpdate() {
         Scheduler s = new Scheduler(5);
         s.setAllTasksSent(true);
         assertTrue(s.getAllTasksSent());
     }
 
     @Test
-    void setDrone_doesNotThrow() {
+    void testSetDroneCrash() {
         Scheduler s = new Scheduler(5);
         s.setDrone(null); // should not crash
     }
 
+    @Test
+    void testPicksHighestScore() throws Exception {
+        Scheduler s = new Scheduler(10);
+
+        Map<Integer, Zone> zones = new HashMap<>();
+        // Base is (0,0). Center of zone 1 is (1,0) distance ~1
+        zones.put(1, new Zone(1, new int[]{0,0}, new int[]{2,0}));
+        // Center of zone 2 is (10,0) distance ~10
+        zones.put(2, new Zone(2, new int[]{9,0}, new int[]{11,0}));
+        s.setZoneIDs(zones);
+
+        // LOW at distance ~1 => 1/1 = 1
+        FireEvent lowClose = new FireEvent(1, TaskType.FIRE_DETECTED, LocalTime.of(13,0), Severity.LOW);
+        // HIGH at distance ~10 => 20/10 = 2  (should win)
+        FireEvent highFar = new FireEvent(2, TaskType.FIRE_DETECTED, LocalTime.of(13,1), Severity.HIGH);
+
+        s.put(lowClose);
+        s.put(highFar);
+
+        FireEvent chosen = s.get(); // uses assignDroneEvent()
+        assertEquals(2, chosen.getZoneID());
+    }
+
+    @Test
+    void testTieBreaker() throws Exception {
+        Scheduler s = new Scheduler(10);
+
+        Map<Integer, Zone> zones = new HashMap<>();
+        // both zones at same distance from base
+        zones.put(1, new Zone(1, new int[]{0,0}, new int[]{2,0}));  // center (1,0)
+        zones.put(2, new Zone(2, new int[]{0,0}, new int[]{2,0}));  // also center (1,0)
+        s.setZoneIDs(zones);
+
+        // both LOW -> same severityScore and same distance -> tie
+        FireEvent e1 = new FireEvent(1, TaskType.FIRE_DETECTED, LocalTime.of(13,0), Severity.LOW);
+        FireEvent e2 = new FireEvent(2, TaskType.FIRE_DETECTED, LocalTime.of(13,1), Severity.LOW);
+
+        s.put(e1);
+        s.put(e2);
+
+        FireEvent chosen = s.get();
+        assertEquals(1, chosen.getZoneID(), "On tie, should keep first event (buffer.peek)");
+    }
+
+    @Test
+    void testZoneDistanceCalc() {
+        Scheduler s = new Scheduler(10);
+
+        Map<Integer, Zone> zones = new HashMap<>();
+        zones.put(1, new Zone(1, new int[]{0,0}, new int[]{6,8})); // center (3,4)
+        s.setZoneIDs(zones);
+
+        // distance from base (0,0) to (3,4) = 5
+        assertEquals(5.0, s.calculateZoneDistance(1, 0), 1e-9);
+    }
+
+    @Test
+    void assignDroneEvent() throws Exception {
+        Scheduler s = new Scheduler(10);
+
+        Map<Integer, Zone> zones = new HashMap<>();
+        zones.put(1, new Zone(1, new int[]{0,0}, new int[]{0,0})); // center (0,0) => distance 0
+        zones.put(2, new Zone(2, new int[]{10,0}, new int[]{10,0}));
+        s.setZoneIDs(zones);
+
+        s.put(new FireEvent(1, TaskType.FIRE_DETECTED, LocalTime.of(13,0), Severity.LOW));
+        s.put(new FireEvent(2, TaskType.FIRE_DETECTED, LocalTime.of(13,1), Severity.HIGH));
+
+        // Right now this will pick zone 1 because score = 1/0 => Infinity.
+        // If you fix the code (e.g., clamp min distance), update expectation.
+        FireEvent chosen = s.get();
+        assertEquals(1, chosen.getZoneID());
+    }
 
 }
