@@ -5,6 +5,12 @@ import FireFightingDroneSwarm.FireIncidentSubsystem.Zone;
 import FireFightingDroneSwarm.Scheduler.Scheduler;
 import FireFightingDroneSwarm.UserInterface.ZoneMapController;
 
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+
 public class Drone implements Runnable {
 
     private final int droneId;
@@ -15,6 +21,10 @@ public class Drone implements Runnable {
     private int waterTank;
     private static final int MAX_TANK = 100;
     private boolean hasFuel = true;
+
+    //UDP
+    DatagramPacket sendPacket, receivePacket;
+    DatagramSocket sendReceiveSocket;
 
     // Drone position (start at base)
     private double posX;
@@ -261,5 +271,28 @@ public class Drone implements Runnable {
      */
     public DroneStatus getStatus() { return status; }
     public int getWaterTank() { return waterTank; } // optional
+
+    /**
+     * Sends the status (as a string) of the drone to the Scheduler server
+     * @param status The status string being sent
+     */
+    public void sendStatus(String status) {
+        System.out.println("Sending drone status: " + status);
+        byte msg[] = status.getBytes();
+        try {
+            sendPacket = new DatagramPacket(msg, msg.length, InetAddress.getLocalHost(), 5000);
+        } catch (UnknownHostException e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
+
+        try {
+            sendReceiveSocket.send(sendPacket);
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
+    }
+
 
 }
