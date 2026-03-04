@@ -6,10 +6,7 @@ import FireFightingDroneSwarm.Scheduler.Scheduler;
 import FireFightingDroneSwarm.UserInterface.ZoneMapController;
 
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
+import java.net.*;
 
 public class Drone implements Runnable {
 
@@ -58,6 +55,13 @@ public class Drone implements Runnable {
         this.zone = 0;
         this.waterTank = MAX_TANK;
         this.hasFuel = true;
+
+        try {
+            sendReceiveSocket = new DatagramSocket();
+        } catch (SocketException e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
     }
 
     /**
