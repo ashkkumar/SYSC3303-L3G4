@@ -54,7 +54,7 @@ public class IncidentReporter implements Runnable {
 
         try {
             socket = new DatagramSocket();
-            schedulerIP = InetAddress.getLocalHost();
+            schedulerIP = InetAddress.getByName("localhost");
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -153,7 +153,11 @@ public class IncidentReporter implements Runnable {
      * leaving it as a number rn
      * byte[1] = zone ID
      * byte[2] = severity level
-     *
+     * byte[3] = task type
+     * byte[4..5] = zone start X coordinate
+     * byte[6..7] = zone start Y coordinate
+     * byte[8..9] = zone end X coordinate
+     * byte[10..11] = zone end Y coordinate
      * This method replaces the direct Scheduler method calls used in
      * previous iterations. Instead of calling scheduler.put(event),
      * the event is serialized into a byte array and transmitted over
@@ -162,29 +166,60 @@ public class IncidentReporter implements Runnable {
      * @param event the FireEvent object that should be reported to the Scheduler
      */
     private void sendEvent(FireEvent event){
-        try {
+            try {
+                Zone zone = getZoneById(event.getZoneID());
 
-            byte[] data = new byte[4];
+                if(zone == null){
+                    System.out.println("[Incident Subsystem] Zone " + event.getZoneID() + " not found");
+                    return;
+                }
 
-            data[0] = 1;
-            data[1] = (byte) event.getZoneID();
-            data[2] = (byte) event.getSeverity().ordinal();
-            data[3] = (byte) event.getTaskType().ordinal();
-            /* should we send the zone datas over too? or should
-            the scheduler do that now?
-            "The Scheduler will now be used to coordinate the movement of drone such
-            that each drone services roughly the same number of zones as all of the others and so that the waiting time for
-            fires to be extinguished in a zone is minimized."
-            */
-            DatagramPacket packet = new DatagramPacket(data, data.length, schedulerIP, schedulerPort);
-            socket.send(packet);
+                // get the x,y coordinates for start and end positions to send over udp
+                int startX = zone.getStartCoordinates()[0];
+                int startY = zone.getStartCoordinates()[1];
+                int endX   = zone.getEndCoordinates()[0];
+                int endY   = zone.getEndCoordinates()[1];
 
-            System.out.println("[Incident Subsystem] Sent event " + event.getZoneID() + " " + event.getSeverity());
-        } catch (Exception e) {
+                byte[] data = new byte[12];
+
+                // data[0] = message type as an int (we can change this)
+                data[0] = 1;
+
+                // data[1] = zone id
+                data[1] = (byte) event.getZoneID();
+
+                // data[2] = severity and data[3] = task type
+                data[2] = (byte) event.getSeverity().ordinal();
+                data[3] = (byte) event.getTaskType().ordinal();
+
+                // data[4..5] = startX coordinate
+                separateBytes(data, 4, startX);
+
+                // data[6..7] = startY coordinate
+                separateBytes(data, 6, startY);
+
+                // data[8..9] = endX coordinate
+                separateBytes(data, 8, endX);
+
+                // data[10..11] = endY coordinate
+                separateBytes(data, 10, endY);
+
+                DatagramPacket packet = new DatagramPacket(data, data.length, schedulerIP, schedulerPort);
+                socket.send(packet);
+
+                System.out.println("[Incident Subsystem] Sent event " + event.getZoneID() + " " + event.getSeverity());
+            } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
+    /**
+     * Sends a UDP packet to the Scheduler indicating that all fire
+     * events from the input file have now been transmitted.
+     *
+     * Packet format:
+     * byte[0] = message type (2 = ALL_EVENTS_SENT)
+     */
     private void allEventsSent(){
         try{
             byte[] data = new byte[1];
@@ -197,6 +232,26 @@ public class IncidentReporter implements Runnable {
             e.printStackTrace();
         }
 
+    }
+
+    /**
+     * the coordinates are too large to be in a single byte if
+     * coordinate is > 255, need to send coordinates split up
+     * @param data
+     * @param offset
+     * @param value
+     */
+    private void separateBytes(byte[] data, int offset, int value){
+        data[offset] = (byte) (value >> 8);
+        data[offset + 1] = (byte) value;
+
+        /**
+         * Maryam this is for u to make your life easier lol
+         * private int combineBytes(byte[] data, int offset){
+         *     return ((data[offset] & 0xFF) << 8) | (data[offset + 1] & 0xFF);
+         * }
+         * this function helps decode the bytes seperated
+         */
     }
 
 }
