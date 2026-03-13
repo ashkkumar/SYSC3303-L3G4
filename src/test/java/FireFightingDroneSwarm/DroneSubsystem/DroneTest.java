@@ -29,6 +29,13 @@ class DroneTest {
         }
     }
 
+    /**
+     * Verifies that the overridden sleep method in TestDrone
+     * does not actually delay execution.
+     *
+     * The test measures the elapsed time and ensures that the
+     * call returns immediately.
+     */
     @Test
     void testSleep() {
         Scheduler scheduler = new Scheduler(5);
@@ -41,6 +48,10 @@ class DroneTest {
         assertTrue(end - start < 50, "Sleep should be overridden and return immediately");
     }
 
+    /**
+     * Tests that a newly created drone starts at the correct
+     * X position (the base location).
+     */
     @Test
     void testGetPosX() {
         Scheduler scheduler = new Scheduler(5);
@@ -50,6 +61,10 @@ class DroneTest {
         assertEquals(0.0, drone.getPosX(), 1e-9);
     }
 
+    /**
+     * Tests that a newly created drone starts at the correct
+     * Y position (the base location).
+     */
     @Test
     void testGetPosY() {
         Scheduler scheduler = new Scheduler(5);
@@ -59,6 +74,10 @@ class DroneTest {
         assertEquals(0.0, drone.getPosY(), 1e-9);
     }
 
+    /**
+     * Verifies that a newly initialized drone begins in the
+     * IDLE state before receiving any tasks.
+     */
     @Test
     void testGetStatus() {
         Scheduler scheduler = new Scheduler(5);
@@ -67,6 +86,10 @@ class DroneTest {
         assertEquals(DroneStatus.IDLE, drone.getStatus());
     }
 
+    /**
+     * Tests that a newly created drone starts with a full water tank.
+     * The expected value corresponds to the MAX_TANK constant (100).
+     */
     @Test
     void testGetWaterTank() {
         Scheduler scheduler = new Scheduler(5);
@@ -75,6 +98,13 @@ class DroneTest {
         assertEquals(100, drone.getWaterTank()); // MAX_TANK = 100
     }
 
+    /**
+     * Tests that a drone can successfully execute a fire task.
+     *
+     * The test creates a simple zone, assigns a FireEvent task
+     * to the drone, and verifies that the drone completes the
+     * task and returns to the IDLE state.
+     */
     @Test
     void testExecuteTask() throws Exception {
 
@@ -101,6 +131,12 @@ class DroneTest {
         assertEquals(DroneStatus.IDLE, drone.getStatus());
     }
 
+    /**
+     * Tests that an illegal state transition is prevented.
+     *
+     * Attempting to move directly from IDLE to ARRIVED should
+     * not be allowed, and the drone should remain in the IDLE state.
+     */
     @Test
     void testTransition() {
 
