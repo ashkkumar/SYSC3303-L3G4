@@ -41,7 +41,6 @@ public class ZoneMapView {
         public DroneData(int droneId, int zoneId, String stateStr) {
             this.droneId = droneId;
             this.zoneId = zoneId;
-            // Map the string from UDP to your existing Enum/State logic
             this.state = DroneState.valueOf(stateStr.toUpperCase());
         }
     }
