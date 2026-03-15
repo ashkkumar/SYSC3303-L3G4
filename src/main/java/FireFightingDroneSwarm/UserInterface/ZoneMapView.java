@@ -21,11 +21,41 @@ public class ZoneMapView {
     private static final int CELL_SIZE = 10;
 
     private ZoneMapPanel zoneMap;
+    private Map<Integer, DroneData> droneMap = new HashMap<>();
+
 
     public ZoneMapView(){
         zoneLengths = new HashMap<>();
         zoneHeights = new HashMap<>();
         buildUserInterface();
+    }
+
+    /**
+     * Data structure to hold the snapshot of a drone's state for rendering.
+     */
+    public static class DroneData {
+        public final int droneId;
+        public final int zoneId;
+        public final DroneState state;
+
+        public DroneData(int droneId, int zoneId, String stateStr) {
+            this.droneId = droneId;
+            this.zoneId = zoneId;
+            // Map the string from UDP to your existing Enum/State logic
+            this.state = DroneState.valueOf(stateStr.toUpperCase());
+        }
+    }
+
+    public enum DroneState {
+        GOING, EXTINGUISHING, RETURNING
+    }
+
+    /**
+     * Called by the Controller to update a specific drone's info.
+     */
+    public void updateDrone(int id, int zone, String status) {
+        droneMap.put(id, new DroneData(id, zone, status));
+        zoneMap.repaint();
     }
 
     /**
@@ -124,6 +154,17 @@ public class ZoneMapView {
         for(Zone z : zones){
             calculateZone(z);
         }
+    }
+
+    /**
+     * Updates the internal state for a specific drone and triggers a repaint.
+     * If the drone ID is new, it is added to the tracking map automatically.
+     * * @param droneId Unique drone identifier.
+     * @param zoneId Current zone location.
+     * @param status Current status string.
+     */
+    public void moveDrone(int droneId, int zoneId, String status) {
+        zoneMap.updateDroneState(droneId, zoneId, status);
     }
 
     /**
@@ -250,6 +291,8 @@ public class ZoneMapView {
 
         private final List<DroneAnimation> drones = new ArrayList<>();
 
+        private final Map<Integer, DroneData> activeDrones = new HashMap<>();
+
         private Timer animationTimer;
 
         /***
@@ -306,6 +349,7 @@ public class ZoneMapView {
          * or destination.
          */
         private static class DroneAnimation {
+
             // Track state of the drone
             enum State {
                 GOING,
@@ -376,6 +420,12 @@ public class ZoneMapView {
                 }
             }
         }
+
+        public void updateDroneState(int id, int zone, String status) {
+            activeDrones.put(id, new DroneData(id, zone, status));
+            this.repaint();
+        }
+
 
         /**
          * Override method of the default paint method in order to

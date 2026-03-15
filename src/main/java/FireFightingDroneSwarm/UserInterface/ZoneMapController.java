@@ -60,4 +60,14 @@ public class ZoneMapController {
     public void droneReturning(int zoneId) {
         SwingUtilities.invokeLater(() -> view.droneReturning(zoneId));
     }
+
+    /**
+     * Updates the specific drone's location and status in the view.
+     * @param droneId Unique ID of the drone.
+     * @param zoneId The zone it is currently associated with.
+     * @param status The status string (e.g., "GOING").
+     */
+    public void updateDroneLocation(int droneId, int zoneId, String status) {
+        SwingUtilities.invokeLater(() -> view.updateDrone(droneId, zoneId, status));
+    }
 }

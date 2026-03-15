@@ -7,6 +7,7 @@ import FireFightingDroneSwarm.FireIncidentSubsystem.IncidentReporter;
 import FireFightingDroneSwarm.FireIncidentSubsystem.InputReader;
 import FireFightingDroneSwarm.FireIncidentSubsystem.Zone;
 import FireFightingDroneSwarm.Scheduler.Scheduler;
+import FireFightingDroneSwarm.UserInterface.UDPListener;
 import FireFightingDroneSwarm.UserInterface.ZoneMapController;
 import FireFightingDroneSwarm.UserInterface.ZoneMapView;
 
@@ -30,6 +31,8 @@ public class DroneSystemTest {
         ZoneMapView GUI = new ZoneMapView();
         ZoneMapController controller = new ZoneMapController(GUI);
         Scheduler scheduler = new Scheduler(15);
+
+        new UDPListener(controller, 5001).start();
 
         InputReader inputReader =
                 new InputReader("sample_event_multiple.csv",
