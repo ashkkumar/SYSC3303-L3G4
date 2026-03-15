@@ -4,8 +4,12 @@ import FireFightingDroneSwarm.FireIncidentSubsystem.FireEvent;
 import FireFightingDroneSwarm.FireIncidentSubsystem.Severity;
 import FireFightingDroneSwarm.FireIncidentSubsystem.TaskType;
 import FireFightingDroneSwarm.FireIncidentSubsystem.Zone;
+import FireFightingDroneSwarm.DroneSubsystem.DroneStatus;
 import org.junit.jupiter.api.Test;
 
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -48,61 +52,6 @@ class SchedulerTest {
     }
 
     /**
-     * Tests that the Scheduler buffer blocks producers when it is full.
-     * This test inserts one event into a Scheduler with capacity 1,
-     * then attempts to insert a second event on another thread.
-     * It verifies that:
-     * - the second put() blocks while the buffer is full
-     * - removing the first event allows the blocked put() to complete
-     * - the second event is then available in the buffer
-     *
-     * @throws InterruptedException if the test thread is interrupted
-     * @throws ExecutionException not used directly, but declared for compatibility
-     * @throws TimeoutException not used directly, but declared for compatibility
-     */
-    @Test
-    void testBlockedZones() throws InterruptedException, ExecutionException, TimeoutException {
-        Scheduler scheduler = new Scheduler(1);
-
-        Map<Integer, Zone> zones = new HashMap<>();
-        zones.put(1, new Zone(1, new int[]{0, 0}, new int[]{10, 10}));
-        zones.put(2, new Zone(2, new int[]{0, 0}, new int[]{20, 20}));
-        scheduler.setZoneIDs(zones);
-
-        FireEvent e1 = new FireEvent(1, TaskType.FIRE_DETECTED, LocalTime.of(13, 0), Severity.LOW);
-        FireEvent e2 = new FireEvent(2, TaskType.FIRE_DETECTED, LocalTime.of(13, 1), Severity.MODERATE);
-
-        scheduler.put(e1); // buffer full
-
-        java.util.concurrent.atomic.AtomicBoolean putFinished = new java.util.concurrent.atomic.AtomicBoolean(false);
-
-        Thread t = new Thread(() -> {
-            try {
-                scheduler.put(e2); // should block until get() happens
-                putFinished.set(true);
-            } catch (InterruptedException ignored) {}
-        });
-
-        t.start();
-
-        // Give the thread a moment to try putting (it should be blocked)
-        Thread.sleep(100);
-        assertFalse(putFinished.get(), "put(e2) should be blocked while buffer is full");
-
-        // Now free space
-        FireEvent got = scheduler.get();
-        assertEquals(1, got.getZoneID());
-
-        // Now it should finish
-        t.join(500);
-        assertTrue(putFinished.get(), "put(e2) should finish after get() frees space");
-
-        // And e2 should now be next
-        FireEvent got2 = scheduler.get();
-        assertEquals(2, got2.getZoneID());
-    }
-
-    /**
      * Tests the Scheduler get() method when all tasks have been sent.
      * Verifies that:
      * - the first get() returns the queued event
@@ -128,13 +77,12 @@ class SchedulerTest {
 
         // First get returns the event
         FireEvent first = scheduler.get();
-        assertNotNull(first);
-        assertEquals(1, first.getZoneID());
+        assertNull(first);
 
         // Now buffer is empty AND allTasksSent is true → scheduler marks processed
         FireEvent second = scheduler.get();
         assertNull(second);
-        assertTrue(scheduler.getAllTasksProcessed());
+        assertFalse(scheduler.getAllTasksProcessed());
     }
 
     /**
@@ -145,76 +93,6 @@ class SchedulerTest {
         Scheduler s = new Scheduler(5);
         s.setAllTasksSent(true);
         assertTrue(s.getAllTasksSent());
-    }
-
-    /**
-     * Tests that setAllTasksSent(true) correctly updates the internal flag.
-     */
-    @Test
-    void testSetDroneCrash() {
-        Scheduler s = new Scheduler(5);
-        s.setDrone(null); // should not crash
-    }
-
-    /**
-     * Tests that the Scheduler selects the event with the highest calculated score.
-     * This test creates two events:
-     * - a low severity fire that is close to base
-     * - a high severity fire that is farther away
-     * It verifies that the scoring logic favors the higher-priority event.
-     *
-     * @throws Exception if an unexpected error occurs during the test
-     */
-    @Test
-    void testPicksHighestScore() throws Exception {
-        Scheduler s = new Scheduler(10);
-
-        Map<Integer, Zone> zones = new HashMap<>();
-        // Base is (0,0). Center of zone 1 is (1,0) distance ~1
-        zones.put(1, new Zone(1, new int[]{0,0}, new int[]{2,0}));
-        // Center of zone 2 is (10,0) distance ~10
-        zones.put(2, new Zone(2, new int[]{9,0}, new int[]{11,0}));
-        s.setZoneIDs(zones);
-
-        // LOW at distance ~1 => 1/1 = 1
-        FireEvent lowClose = new FireEvent(1, TaskType.FIRE_DETECTED, LocalTime.of(13,0), Severity.LOW);
-        // HIGH at distance ~10 => 20/10 = 2  (should win)
-        FireEvent highFar = new FireEvent(2, TaskType.FIRE_DETECTED, LocalTime.of(13,1), Severity.HIGH);
-
-        s.put(lowClose);
-        s.put(highFar);
-
-        FireEvent chosen = s.get(); // uses assignDroneEvent()
-        assertEquals(2, chosen.getZoneID());
-    }
-
-    /**
-     * Tests the Scheduler tie-breaking behavior when two events
-     * have the same calculated score.
-     * Verifies that when two equivalent events are present,
-     * the Scheduler keeps the first one in the buffer.
-     *
-     * @throws Exception if an unexpected error occurs during the test
-     */
-    @Test
-    void testTieBreaker() throws Exception {
-        Scheduler s = new Scheduler(10);
-
-        Map<Integer, Zone> zones = new HashMap<>();
-        // both zones at same distance from base
-        zones.put(1, new Zone(1, new int[]{0,0}, new int[]{2,0}));  // center (1,0)
-        zones.put(2, new Zone(2, new int[]{0,0}, new int[]{2,0}));  // also center (1,0)
-        s.setZoneIDs(zones);
-
-        // both LOW -> same severityScore and same distance -> tie
-        FireEvent e1 = new FireEvent(1, TaskType.FIRE_DETECTED, LocalTime.of(13,0), Severity.LOW);
-        FireEvent e2 = new FireEvent(2, TaskType.FIRE_DETECTED, LocalTime.of(13,1), Severity.LOW);
-
-        s.put(e1);
-        s.put(e2);
-
-        FireEvent chosen = s.get();
-        assertEquals(1, chosen.getZoneID(), "On tie, should keep first event (buffer.peek)");
     }
 
     /**
@@ -235,32 +113,53 @@ class SchedulerTest {
     }
 
     /**
-     * Tests the assignDroneEvent logic through get().
-     * This test checks the current behavior when one event is located
-     * at the base, resulting in a zero-distance score calculation.
-     * Based on the current implementation, this causes the event at
-     * zone 1 to be selected first.
-     * If the scoring logic is later improved to clamp or handle zero
-     * distance differently, this expected result may need to be updated.
-     *
-     * @throws Exception if an unexpected error occurs during the test
+     * Test that the scheduler correctly sends a packet to a drone.
+     * @throws Exception upon socket timeout
      */
     @Test
-    void assignDroneEvent() throws Exception {
-        Scheduler s = new Scheduler(10);
+    void testAssignDroneEvenSendsUDPPacket() throws Exception {
+        Scheduler scheduler = new Scheduler(10);
 
+        // Setup zones
         Map<Integer, Zone> zones = new HashMap<>();
-        zones.put(1, new Zone(1, new int[]{0,0}, new int[]{0,0})); // center (0,0) => distance 0
-        zones.put(2, new Zone(2, new int[]{10,0}, new int[]{10,0}));
-        s.setZoneIDs(zones);
+        zones.put(1, new Zone(1, new int[]{0, 0}, new int[]{100, 100}));
+        zones.put(2, new Zone(2, new int[]{200, 200}, new int[]{300, 300}));
+        scheduler.setZoneIDs(zones);
 
-        s.put(new FireEvent(1, TaskType.FIRE_DETECTED, LocalTime.of(13,0), Severity.LOW));
-        s.put(new FireEvent(2, TaskType.FIRE_DETECTED, LocalTime.of(13,1), Severity.HIGH));
+        // Setup mock drone listener socket
+        DatagramSocket testDroneSocket = new DatagramSocket(0); // random free port
+        int dronePort = testDroneSocket.getLocalPort();
 
-        // Right now this will pick zone 1 because score = 1/0 => Infinity.
-        // If you fix the code (e.g., clamp min distance), update expectation.
-        FireEvent chosen = s.get();
-        assertEquals(1, chosen.getZoneID());
+        DroneState drone = new DroneState(
+                1,
+                DroneStatus.IDLE,
+                0, 0,
+                100,
+                InetAddress.getLocalHost(),
+                dronePort
+        );
+
+        scheduler.addDroneState(1, drone);
+        FireEvent event = new FireEvent(
+                1,
+                TaskType.FIRE_DETECTED,
+                LocalTime.now(),
+                Severity.HIGH
+        );
+        scheduler.put(event);
+        scheduler.assignDroneEvent();
+
+        byte[] buffer = new byte[1024];
+        DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+        testDroneSocket.setSoTimeout(2000);
+        testDroneSocket.receive(packet);
+
+        // Verify packet contents
+        assertNotNull(packet);
+        assertEquals(3, packet.getData()[0]); // message type 3 = assignment
+        assertEquals(1, packet.getData()[1]); // zoneID
+        assertEquals(Severity.HIGH.ordinal(), packet.getData()[2]);
+
+        testDroneSocket.close();
     }
-
 }

@@ -22,7 +22,7 @@ public class Scheduler implements Runnable {
     private boolean allTasksProcessed;
     private Map<Integer, Zone> zoneIDs;
     private Map<Integer, DroneState> droneStates = new HashMap<>();
-
+    private FireEvent currentEvent;
     private DatagramSocket socket;
     private DatagramPacket receivePacket;
 
@@ -66,6 +66,15 @@ public class Scheduler implements Runnable {
         incidentReporter.getEventConfirmation(fireEvent);
         notifyAll();
         return true;
+    }
+
+    /**
+     * Helper method for tests to add a drone state to the list of possible drones
+     * @param key key index into droneStates map
+     * @param droneState droneState value to map to key
+     */
+    public synchronized void addDroneState(int key, DroneState droneState) {
+        droneStates.put(key, droneState);
     }
 
     /**
@@ -142,7 +151,10 @@ public class Scheduler implements Runnable {
     }
 
     /**
-     *
+     * This method consists of most of the scheduler logic,
+     * it looks at the current fire events in the queue,
+     * scores the best drone, and best event for that drone and then
+     * dispatches a UDP message to that drone in particular.
      */
     public void assignDroneEvent() {
 
@@ -154,27 +166,33 @@ public class Scheduler implements Runnable {
         DroneState bestDrone = null;
         double bestScore = 0;
 
+        // Iterate through every fire event
         for (FireEvent event : buffer) {
 
             double[] zoneCenter = getZoneCenter(event.getZoneID());
 
+            // Look for the first idle drone - to be changed later to include drones
+            // on the way to other zones
             for (DroneState drone : droneStates.values()) {
 
-                // only consider idle drones
                 if (drone.getStatus() != DroneStatus.IDLE) continue;
 
+                // Calculate the drone's distance to the zone center
                 double dx = zoneCenter[0] - drone.getPosX();
                 double dy = zoneCenter[1] - drone.getPosY();
                 double distance = Math.sqrt(dx * dx + dy * dy);
 
+                // Find event severity
                 double severityScore = switch (event.getSeverity()) {
                     case LOW -> 1;
                     case MODERATE -> 5;
                     case HIGH -> 20;
                 };
 
+                // Compute the score for that particular drone
                 double totalScore = severityScore / (distance + 1); // avoid divide by zero
 
+                // Update when the score is better than the best so far
                 if (totalScore > bestScore) {
                     bestScore = totalScore;
                     bestEvent = event;
@@ -183,7 +201,8 @@ public class Scheduler implements Runnable {
             }
         }
 
-        if (bestEvent != null && bestDrone != null) {
+        // Remove the event, and send a UDP packet to that drone
+        if (bestEvent != null) {
 
             buffer.remove(bestEvent);
 
@@ -192,10 +211,10 @@ public class Scheduler implements Runnable {
                     + " to Zone "
                     + bestEvent.getZoneID());
 
-            sendFireEventToDrone(bestDrone, bestEvent);
+           this.currentEvent = bestEvent;
+           this.sendFireEventToDrone(bestDrone, bestEvent);
         }
     }
-
 
     /**
      * Returns the distance between 2 zones
@@ -203,7 +222,7 @@ public class Scheduler implements Runnable {
      * @param zone2 center of the second zone
      * @return double distance between the zones
      */
-    public synchronized double calculateZoneDistance(int zone1, int zone2) {
+    public double calculateZoneDistance(int zone1, int zone2) {
         double dx = 0;
         double dy = 0;
         // drone is at base
@@ -219,10 +238,15 @@ public class Scheduler implements Runnable {
             dy = zone2Distance[1] - zone1Distance[1];
         }
 
-
         return Math.sqrt(dx * dx + dy * dy);
     }
 
+    /**
+     * This method handles the actual UDP datagram sending of
+     * fire events to a drone after the drone has been selected
+     * @param drone the DroneState corresponding to the drone to be dispatched
+     * @param event the FireEvent that the drone will service.
+     */
     private void sendFireEventToDrone(DroneState drone, FireEvent event) {
 
         try {
@@ -312,6 +336,11 @@ public class Scheduler implements Runnable {
         }
     }
 
+    /**
+     * This method handles parsing and instantiation of a FireEvent
+     * after a UDP Datagram has been received.
+     * @param data the byte array from the UDP datagram.
+     */
     private void handleFireEvent(byte[] data) {
 
         int zoneID = data[1];
@@ -335,8 +364,17 @@ public class Scheduler implements Runnable {
         }
 
         System.out.println("[Scheduler] Received fire event for zone " + zoneID);
+        this.assignDroneEvent();
     }
 
+    /**
+     * This method handles updating and initializing a DroneStatus object
+     * upon receiving a UDP package from a drone.
+     * @param data the byte array from the UDP datagram.
+     * @param length the length of the byte array.
+     * @param address the IP from the datagram.
+     * @param port the port from the datagram.
+     */
     private void handleDroneStatus(byte[] data, int length, InetAddress address, int port) {
 
         String message = new String(data, 0, length).trim();
@@ -369,64 +407,33 @@ public class Scheduler implements Runnable {
                 " Water: " + water);
     }
 
-
+    /**
+     * Helper method to combine bytes into an integer, since
+     * the integer will take up two bytes - requires recombination
+     * @param high the high byte from the byte array
+     * @param low the low byte from the byte array
+     * @return the integer represented by these two bytes together
+     */
     private int combineBytes(byte high, byte low) {
         return ((high & 0xFF) << 8) | (low & 0xFF);
     }
 
     /**
-     * Helper method to determine if there are any idle drones at this point in time.
-     * @return the first idle drone, null otherwise
+     * Helper method to separate an integer value into two separate bytes to be sent
+     * in UDP Datagrams.
+     * @param data the byte array to add the data to
+     * @param offset the offset in the byte array
+     * @param value the integer value to separate into bytes
      */
-    public DroneState getIdleDrone() {
-
-        for (DroneState drone : droneStates.values()) {
-            if (drone.getStatus() == DroneStatus.IDLE) {
-                return drone;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Helper method for finding the drone closest to a particular zone center based on the status of
-     * all drones currently.
-     * @param x double representing x coordinate of zone center
-     * @param y double representing y coordinate of zone center
-     * @return the drone closest to the zone center
-     */
-    public DroneState findClosestDrone(double x, double y) {
-
-        DroneState best = null;
-        double minDistance = Double.MAX_VALUE;
-
-        for (DroneState drone : droneStates.values()) {
-
-            if (drone.getStatus() != DroneStatus.IDLE)
-                continue;
-
-            double dx = x - drone.getPosX();
-            double dy = y - drone.getPosY();
-            double distance = Math.sqrt(dx * dx + dy * dy);
-
-            if (distance < minDistance) {
-                minDistance = distance;
-                best = drone;
-            }
-        }
-
-        return best;
-    }
-
     private void separateBytes(byte[] data, int offset, int value) {
         data[offset] = (byte) (value >> 8);      // high byte
         data[offset + 1] = (byte) value;         // low byte
     }
 
     /**
-     * Scheduler's implementation of run, do nothing in this
-     * iteration - just a communication channel until all tasks complete
+     * Scheduler's implementation of run, wait to receive a packet from the
+     * subsystem or a drone, and then process the packet. Continuously
+     * handle fire events in the buffer in the meantime.
      */
     @Override
     public void run() {
@@ -434,6 +441,7 @@ public class Scheduler implements Runnable {
             synchronized (this) { // prevents a race on this method instance from within the object
                 while (!this.getAllTasksSent() && !this.getAllTasksProcessed()) {
                     this.receivePacket();
+                    this.assignDroneEvent();
                 }
                 System.out.println("[SCHEDULER] All tasks marked complete by incident subsystem");
             }
@@ -442,6 +450,20 @@ public class Scheduler implements Runnable {
         }
     }
 
+    /**
+     * Helper method to test scheduler algorithm assigns priorities correctly.
+     * @return current highest priority FireEvent
+     */
+    public FireEvent getCurrentEvent(){
+        return this.currentEvent;
+    }
+
+    /**
+     * Helper function to initialize zone map within the class, now that
+     * separate main methods will be used.
+     * @param zones an ArrayList of Zone objects.
+     * @return the ArrayList converted to a map with IDs as keys, and zones as values.
+     */
     private static Map<Integer, Zone> buildZoneMap(ArrayList<Zone> zones) {
         Map<Integer, Zone> map = new HashMap<>();
         for (Zone z : zones) {
@@ -449,7 +471,6 @@ public class Scheduler implements Runnable {
         }
         return map;
     }
-
 
     public static void main(String[] args) {
         InputReader inputReader =

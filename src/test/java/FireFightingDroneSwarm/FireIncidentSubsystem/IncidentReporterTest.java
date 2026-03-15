@@ -6,6 +6,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.InetSocketAddress;
 import java.time.LocalTime;
 import java.util.ArrayList;
 
@@ -88,7 +89,7 @@ class IncidentReporterTest {
      */
     @Test
     void testAllEventsSentPacket() throws Exception {
-        DatagramSocket receiver = new DatagramSocket(5000);
+        DatagramSocket receiver = new DatagramSocket(50000);
         receiver.setSoTimeout(2000);
 
         IncidentReporter reporter = new IncidentReporter(
@@ -127,8 +128,10 @@ class IncidentReporterTest {
      */
     @Test
     void testSendEventPacket() throws Exception {
-        DatagramSocket receiver = new DatagramSocket(5000);
-        receiver.setSoTimeout(2000);
+        DatagramSocket receiver = new DatagramSocket(null);
+        receiver.setReuseAddress(true);
+        receiver.bind(new InetSocketAddress(50000));
+        receiver.setSoTimeout(5000);
 
         IncidentReporter reporter = new IncidentReporter(
                 new InputReader("sample_event_file.csv", "sample_zone_file.csv"),
