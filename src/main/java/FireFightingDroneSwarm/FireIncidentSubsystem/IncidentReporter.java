@@ -2,6 +2,7 @@ package FireFightingDroneSwarm.FireIncidentSubsystem;
 
 import FireFightingDroneSwarm.Scheduler.Scheduler;
 import FireFightingDroneSwarm.UserInterface.ZoneMapController;
+import FireFightingDroneSwarm.UserInterface.ZoneMapView;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -26,7 +27,7 @@ public class IncidentReporter implements Runnable {
 
     private DatagramSocket socket;
     private InetAddress schedulerIP;
-    private int schedulerPort = 5000;
+    private int schedulerPort = 50000;
 
     /**
      * Constructor for this object, takes in an instantiated InputReader
@@ -44,7 +45,6 @@ public class IncidentReporter implements Runnable {
 
     /**
      * new Constructor with UDP socket to instantiate a IncidentReporter object
-     *
      * @param inputReader
      * @param zoneMapController
      */
@@ -113,7 +113,6 @@ public class IncidentReporter implements Runnable {
                     zoneMapController.fireDetected(event.getZoneID());
                 }
                 Thread.sleep((long) (timeBetweenEvents.get(nextEvent) * TIME_SCALE));
-
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
@@ -252,6 +251,16 @@ public class IncidentReporter implements Runnable {
          * }
          * this function helps decode the bytes seperated
          */
+    }
+
+    public static void main(String[] args) {
+
+        InputReader inputReader =
+                new InputReader("sample_event_multiple.csv",
+                        "sample_zone_multiple.csv");
+        ZoneMapController zoneMapController = new ZoneMapController(new ZoneMapView());
+        Thread incidentReporter = new Thread(new IncidentReporter(inputReader, zoneMapController));
+        incidentReporter.start();
     }
 
 }

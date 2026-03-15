@@ -4,20 +4,24 @@ import FireFightingDroneSwarm.FireIncidentSubsystem.Severity;
 import FireFightingDroneSwarm.FireIncidentSubsystem.Zone;
 import FireFightingDroneSwarm.Scheduler.Scheduler;
 import FireFightingDroneSwarm.UserInterface.ZoneMapController;
+import FireFightingDroneSwarm.FireIncidentSubsystem.TaskType;
+import FireFightingDroneSwarm.UserInterface.ZoneMapView;
 
 import java.io.IOException;
 import java.net.*;
+
 
 public class Drone implements Runnable {
 
     private final int droneId;
     private volatile DroneStatus status;
     public FireEvent currentTask;
-    private final Scheduler scheduler;
+    private Scheduler scheduler = null;
     private static final double DRONE_SPEED = 80.0; // units per second (Iteration 0)
     private int waterTank;
     private static final int MAX_TANK = 100;
     private boolean hasFuel = true;
+    double[] zoneCenter = new double[2];
 
     //UDP
     DatagramPacket sendPacket, receivePacket;
@@ -54,7 +58,23 @@ public class Drone implements Runnable {
         this.posY = BASE_Y;
         this.zone = 0;
         this.waterTank = MAX_TANK;
-        this.hasFuel = true;
+
+        try {
+            sendReceiveSocket = new DatagramSocket();
+        } catch (SocketException e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
+    }
+
+    public Drone(int droneId, ZoneMapController zoneMapController) {
+        this.droneId = droneId;
+        this.zoneMapController = zoneMapController;
+        this.status = DroneStatus.IDLE;
+        this.posX = BASE_X;
+        this.posY = BASE_Y;
+
+        this.waterTank = MAX_TANK;
 
         try {
             sendReceiveSocket = new DatagramSocket();
@@ -65,19 +85,29 @@ public class Drone implements Runnable {
     }
 
     /**
-     * The drone waits for tasks, executes them,
-     * and notifies the Scheduler upon completion.
+     * The drone continuously sends its status to the
+     * scheduler so that the scheduler can effectively schedule tasks for the drone.
      */
     @Override
     public void run() {
-        try {
-            while ((currentTask = scheduler.get()) != null) {
-                this.executeTask();
-                scheduler.confirmation(currentTask);
-                currentTask = null;
+
+        while (true) {
+            try {
+                String statusMsg =
+                        droneId + "," +
+                                status + "," +
+                                posX + "," +
+                                posY + "," +
+                                waterTank;
+
+                sendStatus(statusMsg);
+                receiveFireEvent();
+
+                Thread.sleep(5000);
+
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-        } catch (Exception e) {
-            e.printStackTrace();
         }
     }
 
@@ -90,9 +120,7 @@ public class Drone implements Runnable {
         System.out.println("[Drone " + droneId + "] Dispatched to zone "
                 + currentTask.getZoneID());
 
-        // needa sort this out
-
-        double[] xy = scheduler.getZoneCenter(currentTask.getZoneID());
+        double[] xy = zoneCenter;
         this.targetX = xy[0];
         this.targetY = xy[1];
 
@@ -103,14 +131,13 @@ public class Drone implements Runnable {
         travelTo(targetX, targetY);
 
         transition(DroneStatus.ARRIVED);
-        scheduler.notifyArrival(this.droneId);
 
         transition(DroneStatus.DROPPING_AGENT);
         int amountUsed = calculateWaterUsage(currentTask.getSeverity());
         this.waterTank -= amountUsed;
         extinguish(currentTask.getSeverity());
 
-        if(this.waterTank <= 0 || !remaining_flight()) {
+        if(this.waterTank <= 0 || !remainingFlight()) {
             System.out.println("[Drone " + droneId + "] Tank empty or low fuel. Returning.");
             transition(DroneStatus.RETURNING);
             travelTo(BASE_X, BASE_Y);
@@ -223,7 +250,7 @@ public class Drone implements Runnable {
      * Checks if the drone has enough flight capability (fuel) to continue operating.
      * @return true if the drone has sufficient fuel, false if it must return to base.
      */
-    private boolean remaining_flight() {
+    private boolean remainingFlight() {
         return this.hasFuel;
     }
 
@@ -283,8 +310,9 @@ public class Drone implements Runnable {
     public void sendStatus(String status) {
         System.out.println("Sending drone status: " + status);
         byte msg[] = status.getBytes();
+
         try {
-            sendPacket = new DatagramPacket(msg, msg.length, InetAddress.getLocalHost(), 5000);
+            sendPacket = new DatagramPacket(msg, msg.length, InetAddress.getLocalHost(), 50000);
         } catch (UnknownHostException e) {
             e.printStackTrace();
             System.exit(1);
@@ -298,5 +326,66 @@ public class Drone implements Runnable {
         }
     }
 
+    public double[] getZoneCenter(int startX, int startY, int endX, int endY) {
+        int[] s = {startX, startY};
+        int[] e = {endX, endY};
+        return new double[]{ (s[0] + e[0]) / 2.0, (s[1] + e[1]) / 2.0 };
+    }
 
+    public void receiveFireEvent() {
+
+        try {
+
+            receivePacket = new DatagramPacket(new byte[12], 12);
+            sendReceiveSocket.receive(receivePacket);
+
+            byte[] data = receivePacket.getData();
+
+            int messageType = data[0];
+
+            if (messageType != 3) {
+                return; // not a fire event assignment
+            }
+
+            int zoneID = data[1];
+            int severityNum = data[2];
+            int taskNum = data[3];
+
+            int startX = combineBytes(data[4], data[5]);
+            int startY = combineBytes(data[6], data[7]);
+            int endX   = combineBytes(data[8], data[9]);
+            int endY   = combineBytes(data[10], data[11]);
+            zoneCenter = getZoneCenter(startX, startY, endX, endY);
+
+            Severity severity = Severity.values()[severityNum];
+            TaskType taskType = TaskType.values()[taskNum];
+
+            System.out.println("[Drone " + droneId + "] Received fire assignment for zone " + zoneID);
+
+            currentTask = new FireEvent(zoneID, taskType, java.time.LocalTime.now(), severity);
+
+            executeTask();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    /**
+     * Helper function for UDP packet parsing.
+     * @param high upper byte to combine
+     * @param low lower byte to combine
+     * @return integer represented by the combined bytes
+     */
+    private int combineBytes(byte high, byte low) {
+        return ((high & 0xFF) << 8) | (low & 0xFF);
+    }
+
+
+    public static void main(String[] args){
+        ZoneMapController controller = new ZoneMapController(new ZoneMapView());
+        Thread newDrone = new Thread(new Drone(1, controller));
+        newDrone.start();
+    }
 }

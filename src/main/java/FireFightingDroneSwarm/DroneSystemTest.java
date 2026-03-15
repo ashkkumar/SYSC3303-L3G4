@@ -42,7 +42,6 @@ public class DroneSystemTest {
 
         Drone drone = new Drone(1, scheduler, controller);
 
-        scheduler.setDrone(drone);
         scheduler.setIncidentReporter(incidentReporter);
 
         Thread schedulerThread = new Thread(scheduler);
