@@ -5,8 +5,15 @@ import FireFightingDroneSwarm.FireIncidentSubsystem.Severity;
 import FireFightingDroneSwarm.FireIncidentSubsystem.TaskType;
 import FireFightingDroneSwarm.FireIncidentSubsystem.Zone;
 import FireFightingDroneSwarm.Scheduler.Scheduler;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.SocketException;
 import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -148,5 +155,39 @@ class DroneTest {
 
         // Should still be IDLE after
         assertEquals(DroneStatus.IDLE, drone.getStatus());
+    }
+
+    @Nested
+    class UdpTests {
+        private DatagramSocket testReceiverSocket;
+        private Drone drone;
+
+        @BeforeEach
+        void setup() throws SocketException {
+            testReceiverSocket = new DatagramSocket(5000);
+            testReceiverSocket.setSoTimeout(1000);
+            Scheduler scheduler = new Scheduler(5);
+            drone = new Drone(1, scheduler, null);
+        }
+
+        @AfterEach
+        void tearDown() {
+            testReceiverSocket.close();
+        }
+
+        @Test
+        void testSendStatus() throws IOException {
+            String testStatus = "FLYING";
+            drone.sendStatus(testStatus);
+            byte[] buffer = new byte[1024];
+            DatagramPacket receivedPacket = new DatagramPacket(buffer, buffer.length);
+
+            // 3. Capture the packet
+            testReceiverSocket.receive(receivedPacket);
+            String receivedData = new String(receivedPacket.getData(), 0, receivedPacket.getLength());
+
+            // 4. Assertions
+            assertEquals(testStatus, receivedData);
+        }
     }
 }

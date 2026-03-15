@@ -168,6 +168,7 @@ public class Drone implements Runnable {
                 break;
         }
         status = newStatus;
+        sendStatus(newStatus.name());
 
     }
 
