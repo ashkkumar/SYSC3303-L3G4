@@ -16,6 +16,13 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class SchedulerTest {
 
+    /**
+     * Tests the getZoneCenter() method
+     * Verifies that:
+     * - an exception is thrown if zone data has not been initialized
+     * - the center of a valid zone is calculated correctly
+     * - an exception is thrown for an invalid zone ID
+     */
     @Test
     void TestGetZoneCenter() {
         Scheduler s = new Scheduler(10);
@@ -40,6 +47,19 @@ class SchedulerTest {
         assertThrows(IllegalArgumentException.class, () -> s.getZoneCenter(999));
     }
 
+    /**
+     * Tests that the Scheduler buffer blocks producers when it is full.
+     * This test inserts one event into a Scheduler with capacity 1,
+     * then attempts to insert a second event on another thread.
+     * It verifies that:
+     * - the second put() blocks while the buffer is full
+     * - removing the first event allows the blocked put() to complete
+     * - the second event is then available in the buffer
+     *
+     * @throws InterruptedException if the test thread is interrupted
+     * @throws ExecutionException not used directly, but declared for compatibility
+     * @throws TimeoutException not used directly, but declared for compatibility
+     */
     @Test
     void testBlockedZones() throws InterruptedException, ExecutionException, TimeoutException {
         Scheduler scheduler = new Scheduler(1);
@@ -82,6 +102,15 @@ class SchedulerTest {
         assertEquals(2, got2.getZoneID());
     }
 
+    /**
+     * Tests the Scheduler get() method when all tasks have been sent.
+     * Verifies that:
+     * - the first get() returns the queued event
+     * - the second get() returns null once the buffer is empty
+     * - the Scheduler marks all tasks as processed when appropriate
+     *
+     * @throws Exception if an unexpected error occurs during the test
+     */
     @Test
     void TestGet() throws Exception {
         Scheduler scheduler = new Scheduler(5);
@@ -108,6 +137,9 @@ class SchedulerTest {
         assertTrue(scheduler.getAllTasksProcessed());
     }
 
+    /**
+     * Tests that setAllTasksSent(true) correctly updates the internal flag.
+     */
     @Test
     void testSetAllTasksSentUpdate() {
         Scheduler s = new Scheduler(5);
@@ -115,12 +147,24 @@ class SchedulerTest {
         assertTrue(s.getAllTasksSent());
     }
 
+    /**
+     * Tests that setAllTasksSent(true) correctly updates the internal flag.
+     */
     @Test
     void testSetDroneCrash() {
         Scheduler s = new Scheduler(5);
         s.setDrone(null); // should not crash
     }
 
+    /**
+     * Tests that the Scheduler selects the event with the highest calculated score.
+     * This test creates two events:
+     * - a low severity fire that is close to base
+     * - a high severity fire that is farther away
+     * It verifies that the scoring logic favors the higher-priority event.
+     *
+     * @throws Exception if an unexpected error occurs during the test
+     */
     @Test
     void testPicksHighestScore() throws Exception {
         Scheduler s = new Scheduler(10);
@@ -144,6 +188,14 @@ class SchedulerTest {
         assertEquals(2, chosen.getZoneID());
     }
 
+    /**
+     * Tests the Scheduler tie-breaking behavior when two events
+     * have the same calculated score.
+     * Verifies that when two equivalent events are present,
+     * the Scheduler keeps the first one in the buffer.
+     *
+     * @throws Exception if an unexpected error occurs during the test
+     */
     @Test
     void testTieBreaker() throws Exception {
         Scheduler s = new Scheduler(10);
@@ -165,6 +217,11 @@ class SchedulerTest {
         assertEquals(1, chosen.getZoneID(), "On tie, should keep first event (buffer.peek)");
     }
 
+    /**
+     * Tests the calculateZoneDistance() method.
+     * Verifies that the Scheduler correctly computes the Euclidean distance
+     * from the base location to the center of a zone.
+     */
     @Test
     void testZoneDistanceCalc() {
         Scheduler s = new Scheduler(10);
@@ -177,6 +234,17 @@ class SchedulerTest {
         assertEquals(5.0, s.calculateZoneDistance(1, 0), 1e-9);
     }
 
+    /**
+     * Tests the assignDroneEvent logic through get().
+     * This test checks the current behavior when one event is located
+     * at the base, resulting in a zero-distance score calculation.
+     * Based on the current implementation, this causes the event at
+     * zone 1 to be selected first.
+     * If the scoring logic is later improved to clamp or handle zero
+     * distance differently, this expected result may need to be updated.
+     *
+     * @throws Exception if an unexpected error occurs during the test
+     */
     @Test
     void assignDroneEvent() throws Exception {
         Scheduler s = new Scheduler(10);
