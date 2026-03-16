@@ -15,7 +15,8 @@ This project simulates a **firefighting drone swarm system** using concurrent su
 The project emphasizes:
 - Thread-based concurrency  
 - Subsystem interaction  
-- Event-driven scheduling  
+- Event-driven scheduling
+- UDP communication
 - Incremental system development across iterations
 
 ## Subsystems 
@@ -31,14 +32,16 @@ The project emphasizes:
 - `Severity` – Enum representing fire severity  
 - `TaskType` – Enum representing incident task types  
 - `Zone` – Represents a geographic fire zone  
-- `IncidentReporter` – Thread responsible for notifying the Scheduler  
+- `IncidentReporter` – Thread responsible for notifying the Scheduler via UDP 
 
 #### Scheduler (`Scheduler`)
 - Acts as the communication hub between subsystems  
 - Buffers fire events and dispatches tasks to drones  
-- Receives task completion confirmations  
+- Receives task completion confirmations
+- `DroneStatus` - represents a Drone's state to schedule via UDP 
 
 #### User Interface (`UserInterface`)
+- `UDPZoneMapController` - UDP wrapper for ZoneMapController 
 - `ZoneMapController` - Controller for the view
 - `ZoneMapView` - Java Swing view displaying drone dispatch
 - Swing-based graphical interface  
@@ -69,9 +72,9 @@ Ensure the correct JDK (OpenJDK 21.0.8) is selected
 Using Maven:
 mvn clean compile
 Or build directly through your IDE.
-3. Run the Simulation (Iteration 2)
-Navigate to: FireFightingDroneSwarm.DroneSystemTest Run the main() method
-Console output will display: Zone loading, Fire event parsing, Scheduler buffering, Drone dispatch and task completion and display a GUI to visually demonstrate the drones in flight completing tasks
+3. Run the Simulation (Iteration 3)
+   First run UDPZoneMapController main(), then run Scheduler main(), then Drone main(), and finally IncidentReporter main(). 
+
 
 ## Testing
 System-level testing for Iteration 2 is performed through the DroneSystemTest.java class, running this file will execute the main() and perform the tests. This is in addition to individual junit testing classes.
@@ -84,7 +87,7 @@ Multiple test scenarios are executed using different input CSV files to validate
 - Junit tests are available as well for the DroneSubsystem, FireIncidentSubsystem, and Scheduler. To execute these tests open the junit test file (for example DroneTest.java) in Intellij and click the execute button.
 
 ## Responsibility Breakdown
-- Ashwin Kumar – Drone logic, State implementation, Junit tests, Sequence Diagram
-- Maryam Manjra – User interface update, ZoneMapController, ZoneMapView
-- Jason Keah – Scheduler update - scheduling logic
-- Abhiram Sureshkumar – Drone logic, UML Diagram, State Machine Diagram
+- Ashwin Kumar – UDP communication for IncidentReporter, JUnit tests 
+- Maryam Manjra – User interface update, Scheduling logic, UDP for scheduler 
+- Jason Keah – Drone UDP, Drone JUnit tests
+- Abhiram Sureshkumar – User interface update 
