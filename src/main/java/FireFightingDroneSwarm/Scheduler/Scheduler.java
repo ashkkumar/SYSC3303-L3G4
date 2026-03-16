@@ -447,6 +447,7 @@ public class Scheduler implements Runnable {
             }
         } catch (Exception e) {
             e.printStackTrace();
+            socket.close();
         }
     }
 
