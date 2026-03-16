@@ -6,6 +6,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.InetSocketAddress;
 import java.time.LocalTime;
 import java.util.ArrayList;
 
@@ -21,8 +22,7 @@ class IncidentReporterTest {
     @Test
     void testSeparateBytes() throws Exception {
         IncidentReporter reporter = new IncidentReporter(
-                new InputReader("sample_event_file.csv", "sample_zone_file.csv"),
-                null
+                new InputReader("sample_event_file.csv", "sample_zone_file.csv")
         );
 
         byte[] data = new byte[2];
@@ -46,8 +46,7 @@ class IncidentReporterTest {
     @Test
     void testGetZoneById() throws Exception {
         IncidentReporter reporter = new IncidentReporter(
-                new InputReader("sample_event_file.csv", "sample_zone_file.csv"),
-                null
+                new InputReader("sample_event_file.csv", "sample_zone_file.csv")
         );
 
         Method getZoneById = IncidentReporter.class.getDeclaredMethod("getZoneById", int.class);
@@ -67,8 +66,7 @@ class IncidentReporterTest {
     @Test
     void testGetZoneByIdInvalid() throws Exception {
         IncidentReporter reporter = new IncidentReporter(
-                new InputReader("sample_event_file.csv", "sample_zone_file.csv"),
-                null
+                new InputReader("sample_event_file.csv", "sample_zone_file.csv")
         );
 
         Method getZoneById = IncidentReporter.class.getDeclaredMethod("getZoneById", int.class);
@@ -88,12 +86,11 @@ class IncidentReporterTest {
      */
     @Test
     void testAllEventsSentPacket() throws Exception {
-        DatagramSocket receiver = new DatagramSocket(5000);
+        DatagramSocket receiver = new DatagramSocket(50000);
         receiver.setSoTimeout(2000);
 
         IncidentReporter reporter = new IncidentReporter(
-                new InputReader("sample_event_file.csv", "sample_zone_file.csv"),
-                null
+                new InputReader("sample_event_file.csv", "sample_zone_file.csv")
         );
 
         Method allEventsSent = IncidentReporter.class.getDeclaredMethod("allEventsSent");
@@ -127,12 +124,13 @@ class IncidentReporterTest {
      */
     @Test
     void testSendEventPacket() throws Exception {
-        DatagramSocket receiver = new DatagramSocket(5000);
-        receiver.setSoTimeout(2000);
+        DatagramSocket receiver = new DatagramSocket(null);
+        receiver.setReuseAddress(true);
+        receiver.bind(new InetSocketAddress(50000));
+        receiver.setSoTimeout(5000);
 
         IncidentReporter reporter = new IncidentReporter(
-                new InputReader("sample_event_file.csv", "sample_zone_file.csv"),
-                null
+                new InputReader("sample_event_file.csv", "sample_zone_file.csv")
         );
 
         FireEvent event = new FireEvent(
