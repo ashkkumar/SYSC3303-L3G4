@@ -22,8 +22,7 @@ class IncidentReporterTest {
     @Test
     void testSeparateBytes() throws Exception {
         IncidentReporter reporter = new IncidentReporter(
-                new InputReader("sample_event_file.csv", "sample_zone_file.csv"),
-                null
+                new InputReader("sample_event_file.csv", "sample_zone_file.csv")
         );
 
         byte[] data = new byte[2];
@@ -47,8 +46,7 @@ class IncidentReporterTest {
     @Test
     void testGetZoneById() throws Exception {
         IncidentReporter reporter = new IncidentReporter(
-                new InputReader("sample_event_file.csv", "sample_zone_file.csv"),
-                null
+                new InputReader("sample_event_file.csv", "sample_zone_file.csv")
         );
 
         Method getZoneById = IncidentReporter.class.getDeclaredMethod("getZoneById", int.class);
@@ -68,8 +66,7 @@ class IncidentReporterTest {
     @Test
     void testGetZoneByIdInvalid() throws Exception {
         IncidentReporter reporter = new IncidentReporter(
-                new InputReader("sample_event_file.csv", "sample_zone_file.csv"),
-                null
+                new InputReader("sample_event_file.csv", "sample_zone_file.csv")
         );
 
         Method getZoneById = IncidentReporter.class.getDeclaredMethod("getZoneById", int.class);
@@ -93,8 +90,7 @@ class IncidentReporterTest {
         receiver.setSoTimeout(2000);
 
         IncidentReporter reporter = new IncidentReporter(
-                new InputReader("sample_event_file.csv", "sample_zone_file.csv"),
-                null
+                new InputReader("sample_event_file.csv", "sample_zone_file.csv")
         );
 
         Method allEventsSent = IncidentReporter.class.getDeclaredMethod("allEventsSent");
@@ -134,8 +130,7 @@ class IncidentReporterTest {
         receiver.setSoTimeout(5000);
 
         IncidentReporter reporter = new IncidentReporter(
-                new InputReader("sample_event_file.csv", "sample_zone_file.csv"),
-                null
+                new InputReader("sample_event_file.csv", "sample_zone_file.csv")
         );
 
         FireEvent event = new FireEvent(

@@ -23,7 +23,7 @@ public class IncidentReporter implements Runnable {
     private ArrayList<Long> timeBetweenEvents;
     private int nextEvent;
     private final double TIME_SCALE = 0.05;
-    private ZoneMapController zoneMapController;
+    private ZoneMapController zoneMapController = null;
 
     private DatagramSocket socket;
     private InetAddress schedulerIP;
@@ -46,11 +46,9 @@ public class IncidentReporter implements Runnable {
     /**
      * new Constructor with UDP socket to instantiate a IncidentReporter object
      * @param inputReader
-     * @param zoneMapController
      */
-    public IncidentReporter(InputReader inputReader, ZoneMapController zoneMapController) {
+    public IncidentReporter(InputReader inputReader) {
         this.inputReader = inputReader;
-        this.zoneMapController = zoneMapController;
 
         try {
             socket = new DatagramSocket();
@@ -89,8 +87,8 @@ public class IncidentReporter implements Runnable {
 
             timeBetweenEvents.add(0L);
 
-            if(zoneMapController != null){
-                zoneMapController.initializeZones(zones);
+            for(Zone z : zones){
+                sendZoneToGUI(z);
             }
 
         } catch (Exception e){
@@ -204,7 +202,11 @@ public class IncidentReporter implements Runnable {
                 separateBytes(data, 10, endY);
 
                 DatagramPacket packet = new DatagramPacket(data, data.length, schedulerIP, schedulerPort);
+                String guiMessage = "FIRE_EVENT," + event.getZoneID();
+                byte[] guiBytes = guiMessage.getBytes();
+                DatagramPacket guiPacket = new DatagramPacket(guiBytes, guiBytes.length, InetAddress.getLocalHost(), 60000);
                 socket.send(packet);
+                socket.send(guiPacket);
 
                 System.out.println("[Incident Subsystem] Sent event " + event.getZoneID() + " " + event.getSeverity());
             } catch (Exception e) {
@@ -215,7 +217,6 @@ public class IncidentReporter implements Runnable {
     /**
      * Sends a UDP packet to the Scheduler indicating that all fire
      * events from the input file have now been transmitted.
-     *
      * Packet format:
      * byte[0] = message type (2 = ALL_EVENTS_SENT)
      */
@@ -236,30 +237,45 @@ public class IncidentReporter implements Runnable {
     /**
      * the coordinates are too large to be in a single byte if
      * coordinate is > 255, need to send coordinates split up
-     * @param data
-     * @param offset
-     * @param value
+     * @param data the byte array to separate
+     * @param offset the offset in the array to use as index
+     * @param value the integer value to parse
      */
     private void separateBytes(byte[] data, int offset, int value){
         data[offset] = (byte) (value >> 8);
         data[offset + 1] = (byte) value;
+    }
 
-        /**
-         * Maryam this is for u to make your life easier lol
-         * private int combineBytes(byte[] data, int offset){
-         *     return ((data[offset] & 0xFF) << 8) | (data[offset + 1] & 0xFF);
-         * }
-         * this function helps decode the bytes seperated
-         */
+    /**
+     * Helper method to help initialize zones on the GUI by sending as UDP datagram
+     * @param zone the zone to send to the GUI
+     */
+    private void sendZoneToGUI(Zone zone) {
+        try {
+            String msg = "ZONE_INIT," +
+                    zone.getID() + "," +
+                    zone.getStartCoordinates()[0] + "," +
+                    zone.getStartCoordinates()[1] + "," +
+                    zone.getEndCoordinates()[0] + "," +
+                    zone.getEndCoordinates()[1];
+
+            byte[] data = msg.getBytes();
+
+            DatagramPacket packet =
+                    new DatagramPacket(data, data.length, InetAddress.getLocalHost(), 60000);
+
+            socket.send(packet);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     public static void main(String[] args) {
-
         InputReader inputReader =
                 new InputReader("sample_event_multiple.csv",
                         "sample_zone_multiple.csv");
-        ZoneMapController zoneMapController = new ZoneMapController(new ZoneMapView());
-        Thread incidentReporter = new Thread(new IncidentReporter(inputReader, zoneMapController));
+        Thread incidentReporter = new Thread(new IncidentReporter(inputReader));
         incidentReporter.start();
     }
 

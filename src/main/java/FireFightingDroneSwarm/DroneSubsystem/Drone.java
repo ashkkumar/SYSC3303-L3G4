@@ -67,9 +67,8 @@ public class Drone implements Runnable {
         }
     }
 
-    public Drone(int droneId, ZoneMapController zoneMapController) {
+    public Drone(int droneId) {
         this.droneId = droneId;
-        this.zoneMapController = zoneMapController;
         this.status = DroneStatus.IDLE;
         this.posX = BASE_X;
         this.posY = BASE_Y;
@@ -125,6 +124,8 @@ public class Drone implements Runnable {
         this.targetY = xy[1];
 
         transition(DroneStatus.EN_ROUTE);
+        this.sendGuiUpdate("DRONE_DISPATCHED", currentTask.getZoneID());
+
         if (zoneMapController != null) {
             zoneMapController.droneDispatched(currentTask.getZoneID());
         }
@@ -150,6 +151,8 @@ public class Drone implements Runnable {
         }
 
         transition(DroneStatus.RETURNING);
+        this.sendGuiUpdate("DRONE_RETURNING", currentTask.getZoneID());
+
         if (zoneMapController != null) {
             zoneMapController.droneReturning(currentTask.getZoneID());
         }
@@ -332,6 +335,10 @@ public class Drone implements Runnable {
         return new double[]{ (s[0] + e[0]) / 2.0, (s[1] + e[1]) / 2.0 };
     }
 
+    /**
+     * Method to receive fire event on UDP socket from the scheduler and to begin
+     * state execution
+     */
     public void receiveFireEvent() {
 
         try {
@@ -382,10 +389,29 @@ public class Drone implements Runnable {
         return ((high & 0xFF) << 8) | (low & 0xFF);
     }
 
+    /**
+     * Helper method to change GUI view using UDP packets
+     * @param type event type either "DRONE_DISPATCHED" or "DRONE_RETURNING"
+     * @param zoneId int representing zone to which drone is travelling
+     */
+    private void sendGuiUpdate(String type, int zoneId) {
+        try {
+            String msg = type + "," + zoneId;
+            byte[] data = msg.getBytes();
+
+            DatagramPacket packet =
+                    new DatagramPacket(data, data.length, InetAddress.getLocalHost(), 60000);
+
+            sendReceiveSocket.send(packet);
+            System.out.println("Drone sending packet to GUI");
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
     public static void main(String[] args){
-        ZoneMapController controller = new ZoneMapController(new ZoneMapView());
-        Thread newDrone = new Thread(new Drone(1, controller));
+        Thread newDrone = new Thread(new Drone(1));
         newDrone.start();
     }
 }

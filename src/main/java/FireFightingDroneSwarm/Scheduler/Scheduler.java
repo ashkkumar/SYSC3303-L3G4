@@ -378,7 +378,7 @@ public class Scheduler implements Runnable {
     private void handleDroneStatus(byte[] data, int length, InetAddress address, int port) {
 
         String message = new String(data, 0, length).trim();
-
+        System.out.println(message);
         String[] parts = message.split(",");
 
         int droneId = Integer.parseInt(parts[0]);
