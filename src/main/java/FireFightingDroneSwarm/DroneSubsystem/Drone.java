@@ -130,7 +130,6 @@ public class Drone implements Runnable {
             zoneMapController.droneDispatched(currentTask.getZoneID());
         }
         travelTo(targetX, targetY);
-
         transition(DroneStatus.ARRIVED);
 
         transition(DroneStatus.DROPPING_AGENT);
@@ -197,8 +196,15 @@ public class Drone implements Runnable {
                 if (newStatus != DroneStatus.IDLE) return;
                 break;
         }
-        status = newStatus;
 
+        status = newStatus;
+        String statusMsg =
+                droneId + "," +
+                        status + "," +
+                        posX + "," +
+                        posY + "," +
+                        waterTank;
+        sendStatus(statusMsg);
     }
 
     /**
@@ -308,11 +314,11 @@ public class Drone implements Runnable {
 
     /**
      * Sends the status (as a string) of the drone to the Scheduler server
-     * @param status The status string being sent
+     * @param statusMsg The status string being sent
      */
-    public void sendStatus(String status) {
-        System.out.println("Sending drone status: " + status);
-        byte msg[] = status.getBytes();
+    public void sendStatus(String statusMsg) {
+        System.out.println("Sending drone status: " + statusMsg);
+        byte msg[] = statusMsg.getBytes();
 
         try {
             sendPacket = new DatagramPacket(msg, msg.length, InetAddress.getLocalHost(), 50000);
@@ -412,6 +418,8 @@ public class Drone implements Runnable {
 
     public static void main(String[] args){
         Thread newDrone = new Thread(new Drone(1));
+        Thread droneTwo = new Thread(new Drone(2));
         newDrone.start();
+        droneTwo.start();
     }
 }

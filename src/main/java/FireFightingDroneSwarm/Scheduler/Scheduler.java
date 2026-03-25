@@ -159,6 +159,7 @@ public class Scheduler implements Runnable {
     public void assignDroneEvent() {
 
         if (buffer.isEmpty() || droneStates.isEmpty()) {
+            System.out.println("[SCHEDULER] No drones available or no buffer events");
             return;
         }
 
@@ -174,14 +175,12 @@ public class Scheduler implements Runnable {
             // Look for the first idle drone - to be changed later to include drones
             // on the way to other zones
             for (DroneState drone : droneStates.values()) {
-
                 if (drone.getStatus() != DroneStatus.IDLE) continue;
 
                 // Calculate the drone's distance to the zone center
                 double dx = zoneCenter[0] - drone.getPosX();
                 double dy = zoneCenter[1] - drone.getPosY();
                 double distance = Math.sqrt(dx * dx + dy * dy);
-
                 // Find event severity
                 double severityScore = switch (event.getSeverity()) {
                     case LOW -> 1;
@@ -191,7 +190,6 @@ public class Scheduler implements Runnable {
 
                 // Compute the score for that particular drone
                 double totalScore = severityScore / (distance + 1); // avoid divide by zero
-
                 // Update when the score is better than the best so far
                 if (totalScore > bestScore) {
                     bestScore = totalScore;
@@ -378,8 +376,13 @@ public class Scheduler implements Runnable {
     private void handleDroneStatus(byte[] data, int length, InetAddress address, int port) {
 
         String message = new String(data, 0, length).trim();
-        System.out.println(message);
         String[] parts = message.split(",");
+
+
+        if (message.isEmpty()) {
+            System.out.println("Ignoring empty packet");
+            return;
+        }
 
         int droneId = Integer.parseInt(parts[0]);
         DroneStatus status = DroneStatus.valueOf(parts[1]);
@@ -398,7 +401,6 @@ public class Scheduler implements Runnable {
 
         } else {
             drone.update(status, posX, posY, water);
-
         }
 
         System.out.println("[Scheduler] Drone " + droneId +
