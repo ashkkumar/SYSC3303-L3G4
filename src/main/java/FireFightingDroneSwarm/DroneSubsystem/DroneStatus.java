@@ -6,5 +6,7 @@ public enum DroneStatus {
         ARRIVED,
         DROPPING_AGENT,
         RETURNING,
-        REFILLING
+        REFILLING,
+        FAULTED,
+        OUT_OF_SERVICE,
 }
