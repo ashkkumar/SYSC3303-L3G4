@@ -22,6 +22,8 @@ public class Drone implements Runnable {
     private static final int MAX_TANK = 100;
     private boolean hasFuel = true;
     double[] zoneCenter = new double[2];
+    private FaultType injectedFault = FaultType.NONE;
+    private boolean faultTriggered = false;
 
     //UDP
     DatagramPacket sendPacket, receivePacket;
@@ -129,33 +131,48 @@ public class Drone implements Runnable {
         if (zoneMapController != null) {
             zoneMapController.droneDispatched(currentTask.getZoneID());
         }
-        travelTo(targetX, targetY);
+
+        boolean arrived = travelTo(targetX, targetY);
+        if (!arrived) {
+            return;
+        }
         transition(DroneStatus.ARRIVED);
 
         transition(DroneStatus.DROPPING_AGENT);
+        boolean success = extinguish(currentTask.getSeverity());
+
+        if (!success) {
+            return;
+        }
+
         int amountUsed = calculateWaterUsage(currentTask.getSeverity());
         this.waterTank -= amountUsed;
-        extinguish(currentTask.getSeverity());
-
+        /**
         if(this.waterTank <= 0 || !remainingFlight()) {
             System.out.println("[Drone " + droneId + "] Tank empty or low fuel. Returning.");
             transition(DroneStatus.RETURNING);
             travelTo(BASE_X, BASE_Y);
             transition(DroneStatus.REFILLING);
             refill();
+         here it returns if the tank is empty but then after the block it returns again
         }
         else{
+
             System.out.println("[Drone " + droneId + "] Remaining water: " + waterTank + ". Staying in field.");
             transition(DroneStatus.IDLE);
         }
-
+         this chunk is kinda messed up? if tank is not empty then we idle? but idle -> returning is illegal
+        **/
         transition(DroneStatus.RETURNING);
         this.sendGuiUpdate("DRONE_RETURNING", currentTask.getZoneID());
 
         if (zoneMapController != null) {
             zoneMapController.droneReturning(currentTask.getZoneID());
         }
-        travelTo(BASE_X, BASE_Y);
+        boolean returned = travelTo(BASE_X, BASE_Y);
+        if (!returned) {
+            return;
+        }
 
         transition(DroneStatus.REFILLING);
         refill();
@@ -173,6 +190,18 @@ public class Drone implements Runnable {
     synchronized void transition(DroneStatus newStatus) {
         System.out.println("[Drone " + droneId + " " + status + "] Transitioning to " + newStatus);
 
+        if (newStatus == DroneStatus.FAULTED || newStatus == DroneStatus.OUT_OF_SERVICE) {
+            status = newStatus;
+
+            String statusMsg =
+                    droneId + "," +
+                    status + "," +
+                    posX + "," +
+                    posY + "," +
+                    waterTank;
+            sendStatus(statusMsg);
+            return;
+        }
         // we wanna check that the transition is valid, no illegal moves
         // IDLE - > EN_ROUTE -> ARRIVED -> DROPPING_AGENT -> EN_ROUTE or RETURNING -> REFILLING -> IDLE
         switch (status){
@@ -195,6 +224,9 @@ public class Drone implements Runnable {
             case REFILLING:
                 if (newStatus != DroneStatus.IDLE) return;
                 break;
+            case FAULTED:
+            case OUT_OF_SERVICE:
+                return;
         }
 
         status = newStatus;
@@ -209,9 +241,21 @@ public class Drone implements Runnable {
 
     /**
      * Simulates fire extinguishing time based on fire severity.
+     * Now if theres a fault detected with the nozzle it'll put the drone out of service
      * @param severity the severity level of the fire
      */
-    private void extinguish(Severity severity) {
+    private boolean extinguish(Severity severity) {
+
+        if (injectedFault == FaultType.NOZZLE_JAM && !faultTriggered) {
+            faultTriggered = true;
+
+            System.out.println("[Drone " + droneId + "] Fault triggered Nozzle Jam.");
+            transition(DroneStatus.OUT_OF_SERVICE);
+            sendFaultStatus("NOZZLE_JAM");
+
+            return false;
+        }
+
         int extinguishTime;
 
         // need a calc
@@ -223,16 +267,50 @@ public class Drone implements Runnable {
         }
 
         sleep(extinguishTime);
+        return true;
     }
 
     /**
      * Simulates the return flight after task completion.
+     * Changed it to update the drone position gradually
+     * easier to log now
      */
-    private void travelTo(double x, double y) {
+    private boolean travelTo(double x, double y) {
         double distance =  calculateDistanceToZone(x, y);
 
-        long travelTimeMs = (long) ((distance / DRONE_SPEED) * 1000);
-        sleep((int) travelTimeMs);
+        double dx = x - posX;
+        double dy = y - posY;
+
+        long totalTime =  (long) ((distance / DRONE_SPEED) * 1000);
+
+        int steps = 10;
+        double stepX = dx / steps;
+        double stepY = dy / steps;
+        long stepTime = totalTime / steps;
+
+        for (int i = 0; i < steps; i++) {
+
+            if (injectedFault == FaultType.STUCK_MID_FLIGHT && !faultTriggered
+            && i >= steps / 2) {
+                faultTriggered = true;
+                System.out.println("[Drone " + droneId + "] Fault triggered: stuck mid flight");
+
+                transition(DroneStatus.FAULTED);
+                sendFaultStatus("STUCK_MID_FLIGHT");
+
+                return false;
+            }
+            posX += stepX;
+            posY += stepY;
+
+            sendStatus(droneId + "," + status + "," +posX + "," + posY + "," + waterTank);
+            sleep((int) stepTime);
+        }
+
+        posX = x;
+        posY = y;
+        return true;
+
     }
 
     /**
@@ -274,9 +352,6 @@ public class Drone implements Runnable {
         double dx =  x - posX;
         double dy = y - posY;
 
-        posX = x;
-        posY = y;
-
         return Math.sqrt(dx * dx + dy * dy);  // simple distance model
     }
 
@@ -317,6 +392,13 @@ public class Drone implements Runnable {
      * @param statusMsg The status string being sent
      */
     public void sendStatus(String statusMsg) {
+
+        if (injectedFault == FaultType.PACKET_LOSS && !faultTriggered) {
+            faultTriggered = true;
+            System.out.println("[Drone " + droneId + "] Fault triggered: packet loss");
+            return;
+        }
+
         System.out.println("Sending drone status: " + statusMsg);
         byte msg[] = statusMsg.getBytes();
 
@@ -377,6 +459,7 @@ public class Drone implements Runnable {
 
             currentTask = new FireEvent(zoneID, taskType, java.time.LocalTime.now(), severity);
 
+            this.faultTriggered = false;
             executeTask();
 
         } catch (Exception e) {
@@ -412,6 +495,26 @@ public class Drone implements Runnable {
             System.out.println("Drone sending packet to GUI");
 
         } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     *Sends a fault notification to the scheduler over UDP
+     * the message has the format:
+     * FAULT,droneId,faultType,posX,posY
+     * @param fault, the fault encountered by the drone
+     */
+    private void sendFaultStatus(String fault){
+        String msg =  "FAULT," + droneId + "," + fault + "," + posX + "," + posY;
+        System.out.println("Sending fault: " + msg);
+
+        byte[] data = msg.getBytes();
+
+        try {
+            DatagramPacket packet = new DatagramPacket(data, data.length, InetAddress.getLocalHost(), 50000);
+            sendReceiveSocket.send(packet);
+        }catch (Exception e){
             e.printStackTrace();
         }
     }

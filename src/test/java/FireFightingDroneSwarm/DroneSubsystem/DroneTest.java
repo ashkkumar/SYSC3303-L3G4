@@ -22,6 +22,10 @@ class DroneTest {
      * Test drone that disables real sleeping so tests run instantly.
      */
     static class TestDrone extends Drone {
+        public TestDrone(int id) {
+            super(id);
+        }
+
         public TestDrone(int id, Scheduler scheduler) {
             super(id, scheduler, null);
         }
@@ -30,6 +34,7 @@ class DroneTest {
         protected void sleep(int ms) {
             // do nothing (prevents real delay)
         }
+
     }
 
     /**
@@ -137,4 +142,127 @@ class DroneTest {
 
         receiver.close();
     }
+
+    /**
+     * Helper function cause of the private fields in Drone class
+     */
+    private void setPrivateField(Object target, String fieldName, Object value) throws Exception {
+        var field = Drone.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        field.set(target, value);
+    }
+
+    /**
+     * Helper function cause of the private fields in Drone class
+     */
+    private Object getPrivateField(Object target, String fieldName) throws Exception {
+        var field = Drone.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return field.get(target);
+    }
+
+    /**
+     * Tests that a drone correctly handles a STUCK_MID_FLIGHT fault.
+     * - Trigger the fault midway through travel
+     * - Transition into the FAULTED state
+     * - Stop moving before reaching the destination
+     * inshallah
+     */
+    @Test
+    void testStuckMidFlightFault() throws Exception {
+
+        TestDrone drone = new TestDrone(1);
+
+        drone.currentTask = new FireEvent(3, TaskType.FIRE_DETECTED, LocalTime.now(), Severity.HIGH);
+        drone.zoneCenter = new double[]{800.0, 0.0};
+
+        setPrivateField(drone, "injectedFault", FaultType.STUCK_MID_FLIGHT);
+        setPrivateField(drone, "faultTriggered", false);
+
+        drone.executeTask();
+
+        assertEquals(DroneStatus.FAULTED, drone.getStatus());
+        assertTrue(drone.getPosX() > 0 && drone.getPosX() < 800.0);
+    }
+
+    /**
+     * Tests that a drone correctly handles a NOZZLE_JAM fault
+     * The drone should:
+     * - Attempt to extinguish the fire
+     * - Trigger a nozzle jam fault
+     * - Transition into the OUT_OF_SERVICE state
+     * - Not consume any water from the tank
+     */
+    @Test
+    void testNozzleJamFault() throws Exception {
+
+        TestDrone drone = new TestDrone(2);
+
+        drone.currentTask = new FireEvent(4, TaskType.FIRE_DETECTED, LocalTime.now(), Severity.MODERATE);
+        drone.zoneCenter = new double[]{400.0, 0.0};
+
+        setPrivateField(drone, "injectedFault", FaultType.NOZZLE_JAM);
+        setPrivateField(drone, "faultTriggered", false);
+
+        drone.executeTask();
+
+        assertEquals(DroneStatus.OUT_OF_SERVICE, drone.getStatus());
+        assertEquals(100, drone.getWaterTank());
+    }
+
+    /**
+     * Tests that a PACKET_LOSS fault prevents status messages from being sent.
+     * When the fault is injected:
+     * - The drone attempts to send a status update
+     * - The packet is intentionally dropped
+     * - No UDP message is received by the scheduler listener
+     */
+    @Test
+    void testPacketLossDropsStatusPacket() throws Exception {
+
+        DatagramSocket receiver = new DatagramSocket(null);
+        receiver.setReuseAddress(true);
+        receiver.bind(new InetSocketAddress(50000));
+        receiver.setSoTimeout(1000);
+
+        TestDrone drone = new TestDrone(3);
+
+        setPrivateField(drone, "injectedFault", FaultType.PACKET_LOSS);
+        setPrivateField(drone, "faultTriggered", false);
+
+        drone.sendStatus("3,IDLE,0.0,0.0,100");
+
+        byte[] buffer = new byte[100];
+        DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+
+        try {
+            receiver.receive(packet);
+            fail("Packet should have been dropped due to packet loss");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        receiver.close();
+    }
+
+    @Test
+    void testNormalMissionCompletesSuccessfully() throws Exception {
+
+        TestDrone drone = new TestDrone(4);
+
+        drone.currentTask = new FireEvent(5, TaskType.FIRE_DETECTED, LocalTime.now(), Severity.LOW);
+        drone.zoneCenter = new double[]{200.0, 0.0};
+
+        setPrivateField(drone, "injectedFault", FaultType.NONE);
+        setPrivateField(drone, "faultTriggered", false);
+
+        drone.executeTask();
+
+        assertEquals(DroneStatus.IDLE, drone.getStatus());
+        assertEquals(80, drone.getWaterTank());
+        assertEquals(0.0, drone.getPosX(), 0.001);
+        assertEquals(0.0, drone.getPosY(), 0.001);
+    }
+
+
 }
