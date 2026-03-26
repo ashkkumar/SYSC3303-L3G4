@@ -276,15 +276,11 @@ public class Drone implements Runnable {
      * easier to log now
      */
     private boolean travelTo(double x, double y) {
-        //double distance =  calculateDistanceToZone(x, y);
-
-        //long travelTimeMs = (long) ((distance / DRONE_SPEED) * 1000);
-        //sleep((int) travelTimeMs);
+        double distance =  calculateDistanceToZone(x, y);
 
         double dx = x - posX;
         double dy = y - posY;
 
-        double distance = Math.sqrt(dx * dx + dy * dy);
         long totalTime =  (long) ((distance / DRONE_SPEED) * 1000);
 
         int steps = 10;
@@ -355,9 +351,6 @@ public class Drone implements Runnable {
 
         double dx =  x - posX;
         double dy = y - posY;
-
-        posX = x;
-        posY = y;
 
         return Math.sqrt(dx * dx + dy * dy);  // simple distance model
     }
