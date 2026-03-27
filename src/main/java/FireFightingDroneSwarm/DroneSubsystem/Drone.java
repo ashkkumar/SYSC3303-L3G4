@@ -1,4 +1,5 @@
 package FireFightingDroneSwarm.DroneSubsystem;
+import FireFightingDroneSwarm.Events.EventLogger;
 import FireFightingDroneSwarm.FireIncidentSubsystem.FireEvent;
 import FireFightingDroneSwarm.FireIncidentSubsystem.Severity;
 import FireFightingDroneSwarm.FireIncidentSubsystem.Zone;
@@ -45,13 +46,16 @@ public class Drone implements Runnable {
     private double targetY;
     private ZoneMapController zoneMapController;
 
+    //event logger
+    private EventLogger logger;
+
 
     /**
      * @param droneId    ID to represent a drone object
      * @param scheduler  The Scheduler the drone communicates with
      * @param zoneMapController
      */
-    public Drone(int droneId, Scheduler scheduler, ZoneMapController zoneMapController) {
+    public Drone(int droneId, Scheduler scheduler, ZoneMapController zoneMapController, EventLogger logger) {
         this.droneId = droneId;
         this.scheduler = scheduler;
         this.status = DroneStatus.IDLE;
@@ -60,6 +64,7 @@ public class Drone implements Runnable {
         this.posY = BASE_Y;
         this.zone = 0;
         this.waterTank = MAX_TANK;
+        this.logger = logger;
 
         try {
             sendReceiveSocket = new DatagramSocket();
@@ -120,6 +125,9 @@ public class Drone implements Runnable {
     void executeTask() {
         System.out.println("[Drone " + droneId + "] Dispatched to zone "
                 + currentTask.getZoneID());
+        if (logger != null) {
+            logger.Log("Drone " + droneId, "DISPATCHED", "Drone " + droneId + "Dispatched to zone " + currentTask.getZoneID());
+        }
 
         double[] xy = zoneCenter;
         this.targetX = xy[0];
@@ -128,20 +136,25 @@ public class Drone implements Runnable {
         transition(DroneStatus.EN_ROUTE);
         this.sendGuiUpdate("DRONE_DISPATCHED", currentTask.getZoneID());
 
+
         if (zoneMapController != null) {
             zoneMapController.droneDispatched(currentTask.getZoneID());
         }
 
         boolean arrived = travelTo(targetX, targetY);
         if (!arrived) {
+            if (logger != null) {logger.Log("Drone " + droneId, "STUCK", "Drone " + droneId + "Stuck on route to zone " + currentTask.getZoneID());}
             return;
         }
         transition(DroneStatus.ARRIVED);
+        if (logger != null) {logger.Log("Drone " + droneId, "ARRIVED", "Drone " + droneId + "Arrived at zone " + currentTask.getZoneID());}
+
 
         transition(DroneStatus.DROPPING_AGENT);
         boolean success = extinguish(currentTask.getSeverity());
 
         if (!success) {
+            if (logger != null) {logger.Log("Drone " + droneId, "JAMMED", "Drone " + droneId + "Nozzle Jammed, currently in zone " + currentTask.getZoneID());}
             return;
         }
 
@@ -165,6 +178,8 @@ public class Drone implements Runnable {
         **/
         transition(DroneStatus.RETURNING);
         this.sendGuiUpdate("DRONE_RETURNING", currentTask.getZoneID());
+        if (logger != null) {logger.Log("Drone " + droneId, "RETURNING", "Drone " + droneId + "returning from zone " + currentTask.getZoneID());}
+
 
         if (zoneMapController != null) {
             zoneMapController.droneReturning(currentTask.getZoneID());
@@ -179,6 +194,8 @@ public class Drone implements Runnable {
 
         transition(DroneStatus.IDLE);
         System.out.println("[Drone " + droneId + "] returned to base");
+        if (logger != null) {logger.Log("Drone " + droneId, "IDLE", "Drone " + droneId + "IDLE");}
+
 
         // zone = currentTask.getZoneID(); for when we implement refilling, if the tank isn't full it will stay and go to idle
     }

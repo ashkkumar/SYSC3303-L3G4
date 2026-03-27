@@ -1,5 +1,6 @@
 package FireFightingDroneSwarm.DroneSubsystem;
 
+import FireFightingDroneSwarm.Events.EventLogger;
 import FireFightingDroneSwarm.FireIncidentSubsystem.FireEvent;
 import FireFightingDroneSwarm.FireIncidentSubsystem.Severity;
 import FireFightingDroneSwarm.FireIncidentSubsystem.TaskType;
@@ -17,6 +18,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 class DroneTest {
+    private static EventLogger logger = new EventLogger(1000);
 
     /**
      * Test drone that disables real sleeping so tests run instantly.
@@ -27,7 +29,7 @@ class DroneTest {
         }
 
         public TestDrone(int id, Scheduler scheduler) {
-            super(id, scheduler, null);
+            super(id, scheduler, null, logger);
         }
 
         @Override
