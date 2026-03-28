@@ -182,7 +182,7 @@ public class IncidentReporter implements Runnable {
             int endY   = zone.getEndCoordinates()[1];
 
             // increased size from 12 -> 13 due to added fault type byte
-            byte[] data = new byte[13];
+            byte[] data = new byte[15];
 
             // data[0] = message type
             data[0] = 1;
@@ -208,6 +208,8 @@ public class IncidentReporter implements Runnable {
 
             // data[11..12] = endY coordinate
             separateBytes(data, 11, endY);
+
+            separateBytes(data, 13, event.getFireID());
 
             DatagramPacket packet = new DatagramPacket(data, data.length, schedulerIP, schedulerPort);
 

@@ -15,6 +15,7 @@ public class FireEvent {
     private Severity severity;
     private Scheduler scheduler;
     private FaultType fault;
+    private int fireID;
 
     /**
      * Constructor for a FireEvent object, to represent incoming fire events.
@@ -23,12 +24,13 @@ public class FireEvent {
      * @param timestamp LocalTime representation of timestamp
      * @param severity enum value of Severity
      */
-    public FireEvent(int zone, TaskType taskType, LocalTime timestamp, Severity severity, FaultType fault) {
+    public FireEvent(int zone, TaskType taskType, LocalTime timestamp, Severity severity, FaultType fault, int fireID) {
         this.zoneID = zone;
         this.taskType = taskType;
         this.timestamp = timestamp;
         this.severity = severity;
         this.fault = fault;
+        this.fireID = fireID;
     }
 
     /**
@@ -78,6 +80,10 @@ public class FireEvent {
      */
     public String toString() {
         return "FireEvent [zoneID=" + zoneID + ", taskType=" + taskType + ", timestamp=" +
-                timestamp + ", severity=" + severity + ", fault=" + fault + "]";
+                timestamp + ", severity=" + severity + ", fault=" + fault + ", fireID=" + fireID + "]";
+    }
+
+    public int getFireID() {
+        return fireID;
     }
 }

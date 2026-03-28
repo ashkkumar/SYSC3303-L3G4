@@ -72,6 +72,10 @@ public class UDPZoneMapController implements Runnable {
                 int zoneId = Integer.parseInt(parts[1]);
                 SwingUtilities.invokeLater(() -> controller.droneReturning(zoneId));
             }
+            case "DRONE_FAULTED" -> {
+                int zoneId = Integer.parseInt(parts[1]);
+                SwingUtilities.invokeLater(() -> controller.droneFaulted(zoneId));
+            }
             case "ZONE_INIT" -> {
 
                 int id = Integer.parseInt(parts[1]);

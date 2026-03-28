@@ -28,6 +28,7 @@ public class Scheduler implements Runnable {
     //private FireEvent currentEvent;
     private DatagramSocket socket;
     private DatagramPacket receivePacket;
+    private Random rand = new Random();
 
     /**
      * Constructor for the scheduler, default drones and incident
@@ -166,6 +167,10 @@ public class Scheduler implements Runnable {
             return;
         }
 
+        for(FireEvent fireEvent : buffer) {
+            System.out.println(fireEvent);
+        }
+
         FireEvent bestEvent = null;
         DroneState bestDrone = null;
         double bestScore = 0;
@@ -175,10 +180,15 @@ public class Scheduler implements Runnable {
 
             double[] zoneCenter = getZoneCenter(event.getZoneID());
 
+            for(DroneState drone: droneStates.values()) {
+                System.out.println(drone);
+            }
             // Look for the first idle drone - to be changed later to include drones
             // on the way to other zones
             for (DroneState drone : droneStates.values()) {
                 if (drone.getStatus() != DroneStatus.IDLE) continue;
+                if (activeAssignments.get(drone.getDroneId()) != null) continue;
+
 
                 // Calculate the drone's distance to the zone center
                 double dx = zoneCenter[0] - drone.getPosX();
@@ -214,7 +224,7 @@ public class Scheduler implements Runnable {
 
             activeAssignments.put(bestDrone.getDroneId(), bestEvent);
             assignmentStartTimes.put(bestDrone.getDroneId(), System.currentTimeMillis());
-
+            bestDrone.update(DroneStatus.EN_ROUTE, bestDrone.getPosX(), bestDrone.getPosY(), bestDrone.getWaterTank());
            //this.currentEvent = bestEvent;
            this.sendFireEventToDrone(bestDrone, bestEvent);
         }
@@ -261,8 +271,9 @@ public class Scheduler implements Runnable {
             int startY = zone.getStartCoordinates()[1];
             int endX = zone.getEndCoordinates()[0];
             int endY = zone.getEndCoordinates()[1];
+            int fireID = event.getFireID();
 
-            byte[] data = new byte[13];
+            byte[] data = new byte[15];
 
             data[0] = 3; // message type (assignment)
             data[1] = (byte) event.getZoneID();
@@ -277,6 +288,7 @@ public class Scheduler implements Runnable {
             separateBytes(data, 7, startY);
             separateBytes(data, 9, endX);
             separateBytes(data, 11, endY);
+            separateBytes(data, 13, fireID);
 
             InetAddress droneAddress = drone.getAddress();
             int dronePort = drone.getPort();
@@ -373,12 +385,13 @@ public class Scheduler implements Runnable {
         int startY = combineBytes(data[7], data[8]);
         int endX   = combineBytes(data[9], data[10]);
         int endY   = combineBytes(data[11], data[12]);
+        int eventId = combineBytes(data[13], data[14]);
 
         Severity severity = Severity.values()[severityNum];
         TaskType taskType = TaskType.values()[taskNum];
         FaultType faultType = FaultType.values()[faultNum];
 
-        FireEvent event = new FireEvent(zoneID, taskType, LocalTime.now(), severity, faultType);
+        FireEvent event = new FireEvent(zoneID, taskType, LocalTime.now(), severity, faultType, eventId);
 
         try {
             put(event);
@@ -419,7 +432,7 @@ public class Scheduler implements Runnable {
         double posX = Double.parseDouble(parts[2]);
         double posY = Double.parseDouble(parts[3]);
         int water = Integer.parseInt(parts[4]);
-
+        int fireID = Integer.parseInt(parts[5]);
 
         DroneState drone = droneStates.get(droneId);
 
@@ -430,7 +443,13 @@ public class Scheduler implements Runnable {
             System.out.println("[Scheduler] Registered Drone " + droneId);
 
         } else {
-            drone.update(status, posX, posY, water);
+
+            if(activeAssignments.get(droneId) != null) {
+                if(fireID == activeAssignments.get(droneId).getFireID()) {
+                    drone.update(status, posX, posY, water);
+                }
+            }
+
         }
 
         switch(status) {
@@ -445,8 +464,8 @@ public class Scheduler implements Runnable {
                             assignedEvent.getTaskType(),
                             LocalTime.now(),
                             assignedEvent.getSeverity(),
-                            FaultType.NONE
-                    );
+                            FaultType.NONE,
+                    rand.nextInt(12) + 1);
 
                     try {
                         put(failed);
@@ -457,8 +476,12 @@ public class Scheduler implements Runnable {
                 break;
             }
             case IDLE:
-                activeAssignments.remove(droneId);
-                assignmentStartTimes.remove(droneId);
+                if(activeAssignments.get(droneId) != null){
+                    if(fireID == activeAssignments.get(droneId).getFireID()){
+                        activeAssignments.remove(droneId);
+                        assignmentStartTimes.remove(droneId);
+                    }
+                }
                 break;
             default:
                 break;

@@ -233,6 +233,12 @@ public class ZoneMapView {
         }
     }
 
+    public void droneFaulted(int zoneId) {
+        if (zoneMap != null) {
+            zoneMap.droneFaulted(zoneId);
+        }
+    }
+
     /**
      * This class represents the GUI element consisting of the zones and
      * the drone illustrations. As this zone is the only one that
@@ -279,6 +285,8 @@ public class ZoneMapView {
                         // If it is extinguishing, keep it where it is until updated by the controller
                         case EXTINGUISHING:
                             break;
+                        case FAULTED:
+                            break;
                     }
                 }
 
@@ -310,7 +318,8 @@ public class ZoneMapView {
             enum State {
                 GOING,
                 EXTINGUISHING,
-                RETURNING
+                RETURNING,
+                FAULTED
             }
 
             int zoneId;
@@ -370,9 +379,25 @@ public class ZoneMapView {
          */
         public void droneReturning(int zoneId) {
             for (DroneAnimation drone : drones) {
-                if (drone.zoneId == zoneId && drone.state == DroneAnimation.State.EXTINGUISHING) {
-                    fireExtinguished(zoneId);
-                    drone.state = DroneAnimation.State.RETURNING;
+                if (drone.zoneId == zoneId) {
+
+                    if (drone.state == DroneAnimation.State.EXTINGUISHING) {
+                        fireExtinguished(zoneId);
+                        drone.state = DroneAnimation.State.RETURNING;
+                    }
+
+                    if(drone.state == DroneAnimation.State.FAULTED) {
+                        drone.state = DroneAnimation.State.RETURNING;
+                    }
+
+                }
+            }
+        }
+
+        public void droneFaulted(int zoneId) {
+            for(DroneAnimation drone: drones) {
+                if(drone.zoneId == zoneId){
+                    drone.state = DroneAnimation.State.FAULTED;
                 }
             }
         }
@@ -483,6 +508,9 @@ public class ZoneMapView {
                             break;
                         case RETURNING:
                             g2.setColor(new Color(180, 130, 180));
+                            break;
+                        case FAULTED:
+                            g2.setColor(Color.BLACK);
                             break;
                     }
 

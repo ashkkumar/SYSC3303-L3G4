@@ -60,4 +60,8 @@ public class ZoneMapController {
     public void droneReturning(int zoneId) {
         SwingUtilities.invokeLater(() -> view.droneReturning(zoneId));
     }
+
+    public void droneFaulted(int zoneId) {
+        SwingUtilities.invokeLater(() -> view.droneFaulted(zoneId));
+    }
 }
