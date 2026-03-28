@@ -55,13 +55,14 @@ public class UDPZoneMapController implements Runnable {
      * @param message the String received from the UDP datagram
      */
     private void handlePacket(String message) {
+        System.out.println(message);
         String[] parts = message.split(",");
         System.out.println(parts[0]);
         switch (parts[0]) {
             case "FIRE_EVENT" -> {
                 int zoneId = Integer.parseInt(parts[1]);
                 int severity = Integer.parseInt(parts[2]);
-
+                System.out.println("IN GUI UDP CONTROLLER" + zoneId + " " + severity);
                 SwingUtilities.invokeLater(() -> controller.fireDetected(zoneId, severity));
             }
             case "DRONE_DISPATCHED" -> {

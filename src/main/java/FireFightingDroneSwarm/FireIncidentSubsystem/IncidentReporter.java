@@ -211,7 +211,7 @@ public class IncidentReporter implements Runnable {
 
             DatagramPacket packet = new DatagramPacket(data, data.length, schedulerIP, schedulerPort);
 
-            String guiMessage = "FIRE_EVENT," + event.getZoneID();
+            String guiMessage = "FIRE_EVENT," + event.getZoneID() + "," + event.getSeverity().ordinal();
             byte[] guiBytes = guiMessage.getBytes();
             DatagramPacket guiPacket = new DatagramPacket(guiBytes, guiBytes.length, InetAddress.getLocalHost(), 60000);
 
