@@ -111,7 +111,7 @@ public class IncidentReporter implements Runnable {
             try {
                 sendEvent(event);
                 if (zoneMapController != null) {
-                    zoneMapController.fireDetected(event.getZoneID());
+                    zoneMapController.fireDetected(event.getZoneID(), 1);
                 }
                 Thread.sleep((long) (timeBetweenEvents.get(nextEvent) * TIME_SCALE));
             } catch (InterruptedException e) {

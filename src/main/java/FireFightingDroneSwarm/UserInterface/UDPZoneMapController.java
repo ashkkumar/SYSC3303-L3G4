@@ -60,7 +60,9 @@ public class UDPZoneMapController implements Runnable {
         switch (parts[0]) {
             case "FIRE_EVENT" -> {
                 int zoneId = Integer.parseInt(parts[1]);
-                SwingUtilities.invokeLater(() -> controller.fireDetected(zoneId));
+                int severity = Integer.parseInt(parts[2]);
+
+                SwingUtilities.invokeLater(() -> controller.fireDetected(zoneId, severity));
             }
             case "DRONE_DISPATCHED" -> {
                 int zoneId = Integer.parseInt(parts[1]);

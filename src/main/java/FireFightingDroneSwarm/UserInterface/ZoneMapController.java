@@ -39,8 +39,8 @@ public class ZoneMapController {
      * zone.
      * @param zoneId the ID of the zone in which a fire is detected.
      */
-    public void fireDetected(int zoneId) {
-        SwingUtilities.invokeLater(() -> view.fireDetected(zoneId));
+    public void fireDetected(int zoneId, int severity) {
+        SwingUtilities.invokeLater(() -> view.fireDetected(zoneId, severity));
     }
 
     /**

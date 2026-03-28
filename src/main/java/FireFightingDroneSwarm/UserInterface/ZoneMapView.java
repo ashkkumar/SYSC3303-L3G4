@@ -202,9 +202,9 @@ public class ZoneMapView {
      * illustration on the ZoneMapPanel of a fire.
      * @param zoneId id of zone where fire is detected.
      */
-    public void fireDetected(int zoneId) {
+    public void fireDetected(int zoneId, int severity) {
         if (zoneMap != null) {
-            zoneMap.fireDetected(zoneId);
+            zoneMap.fireDetected(zoneId, severity);
         }
     }
 
@@ -247,6 +247,7 @@ public class ZoneMapView {
         // timer update
         private final List<Integer> activeFires = new ArrayList<>();
         private final List<Integer> extinguishedFires = new ArrayList<>();
+        private final List<Integer> fireSeverity = new ArrayList<>();
 
         private final List<DroneAnimation> drones = new ArrayList<>();
 
@@ -334,8 +335,9 @@ public class ZoneMapView {
          * automatically get updated in the next 30 ms increment when the panel is repainted.
          * @param zoneId integer ID of the zone to paint a fire in.
          */
-        public void fireDetected(int zoneId) {
+        public void fireDetected(int zoneId, int severity) {
             activeFires.add(zoneId);
+            fireSeverity.add(severity);
         }
 
 
@@ -345,7 +347,9 @@ public class ZoneMapView {
          * @param zoneId integer ID of the zone to paint an extinguished fire in,
          */
         public void fireExtinguished(int zoneId) {
+            int index = activeFires.indexOf(zoneId);
             activeFires.remove((Integer) zoneId);
+            fireSeverity.remove(index);
             extinguishedFires.add(zoneId);
         }
 
@@ -417,7 +421,23 @@ public class ZoneMapView {
 
                 // Paint the fire in this zone
                 if (activeFires.contains(zone.getID())) {
-                    g2.setColor(Color.RED);
+                    int index = activeFires.indexOf(zone.getID());
+                    int severity = fireSeverity.get(index);
+
+                    switch (severity) {
+                        case 0:
+                            g2.setColor(Color.YELLOW);
+                            break;
+                        case 1:
+                            g2.setColor(Color.ORANGE);
+                            break;
+                        case 2:
+                            g2.setColor(Color.RED);
+                            break;
+                        default:
+                            g2.setColor(Color.RED);
+                            break;
+                    }
                     g2.fillRect(
                             (int) rect.getCenterX(),
                             (int) rect.getCenterY(),
