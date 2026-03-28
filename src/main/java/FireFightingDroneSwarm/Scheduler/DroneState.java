@@ -78,6 +78,7 @@ public class DroneState {
      */
     public int getDroneId() { return droneId; }
 
+    public int getWaterTank() { return waterTank; }
     /**
      * Update method to update the drone's status when it has a state change
      * @param status DroneStatus value for state change
@@ -90,5 +91,9 @@ public class DroneState {
         this.posX = posX;
         this.posY = posY;
         this.waterTank = waterTank;
+    }
+
+    public String toString() {
+        return "DroneState [droneId=" + droneId + ", status=" + status + ", posX=" + posX + ", posY=" + posY + ", waterTank=" + waterTank + ", address=" + address + ", port=" + port + "]";
     }
 }

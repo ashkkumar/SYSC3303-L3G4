@@ -42,6 +42,7 @@ public class InputReader {
      */
     public ArrayList<FireEvent> parseEventFile() {
         ArrayList<FireEvent> events = new ArrayList<>();
+        int count = 1;
 
         try (BufferedReader br = createReader(eventResource)) {
             String line;
@@ -95,7 +96,8 @@ public class InputReader {
                     }
 
                     FireEvent event =
-                            new FireEvent(zoneID, taskType, timestamp, severity, fault);
+                            new FireEvent(zoneID, taskType, timestamp, severity, fault, count);
+                    count++;
                     events.add(event);
                 }
             }

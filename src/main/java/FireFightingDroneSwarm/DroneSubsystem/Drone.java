@@ -35,7 +35,6 @@ public class Drone implements Runnable {
     //Drone zone
     private int zone;
 
-    // Base position (choose whatever your sim assumes; often 0,0)
     private static final double BASE_X = 0;
     private static final double BASE_Y = 0;
 
@@ -45,10 +44,9 @@ public class Drone implements Runnable {
     private ZoneMapController zoneMapController;
 
 
-
     /**
-     * @param droneId    ID to represent a drone object
-     * @param scheduler  The Scheduler the drone communicates with
+     * @param droneId           ID to represent a drone object
+     * @param scheduler         The Scheduler the drone communicates with
      * @param zoneMapController
      */
     public Drone(int droneId, Scheduler scheduler, ZoneMapController zoneMapController) {
@@ -101,6 +99,11 @@ public class Drone implements Runnable {
                                 posY + "," +
                                 waterTank;
 
+                if (currentTask != null) {
+                    statusMsg += "," + currentTask.getFireID();
+                } else {
+                    statusMsg += "," + 0;
+                }
                 sendStatus(statusMsg);
                 receiveFireEvent();
 
@@ -139,10 +142,18 @@ public class Drone implements Runnable {
         if (!arrived) {
             transition(DroneStatus.RETURNING);
             this.sendGuiUpdate("DRONE_RETURNING", currentTask.getZoneID());
+
+            if (zoneMapController != null) {
+                zoneMapController.droneReturning(currentTask.getZoneID());
+            }
+
             boolean returned = travelTo(BASE_X, BASE_Y);
             if (!returned) {
                 return;
             }
+            transition(DroneStatus.REFILLING);
+            refill();
+
             transition(DroneStatus.IDLE);
             System.out.println("[Drone " + droneId + "] returned to base");
 
@@ -161,21 +172,21 @@ public class Drone implements Runnable {
         int amountUsed = calculateWaterUsage(currentTask.getSeverity());
         this.waterTank -= amountUsed;
         /**
-        if(this.waterTank <= 0 || !remainingFlight()) {
-            System.out.println("[Drone " + droneId + "] Tank empty or low fuel. Returning.");
-            transition(DroneStatus.RETURNING);
-            travelTo(BASE_X, BASE_Y);
-            transition(DroneStatus.REFILLING);
-            refill();
+         if(this.waterTank <= 0 || !remainingFlight()) {
+         System.out.println("[Drone " + droneId + "] Tank empty or low fuel. Returning.");
+         transition(DroneStatus.RETURNING);
+         travelTo(BASE_X, BASE_Y);
+         transition(DroneStatus.REFILLING);
+         refill();
          here it returns if the tank is empty but then after the block it returns again
-        }
-        else{
+         }
+         else{
 
-            System.out.println("[Drone " + droneId + "] Remaining water: " + waterTank + ". Staying in field.");
-            transition(DroneStatus.IDLE);
-        }
+         System.out.println("[Drone " + droneId + "] Remaining water: " + waterTank + ". Staying in field.");
+         transition(DroneStatus.IDLE);
+         }
          this chunk is kinda messed up? if tank is not empty then we idle? but idle -> returning is illegal
-        **/
+         **/
         transition(DroneStatus.RETURNING);
         this.sendGuiUpdate("DRONE_RETURNING", currentTask.getZoneID());
 
@@ -200,32 +211,34 @@ public class Drone implements Runnable {
 
     /**
      * Validates if the new status is a valid transiton
+     *
      * @param newStatus The new state of the drone
      */
     synchronized void transition(DroneStatus newStatus) {
         System.out.println("[Drone " + droneId + " " + status + "] Transitioning to " + newStatus);
 
-        if ( newStatus == DroneStatus.OUT_OF_SERVICE) {
+        if (newStatus == DroneStatus.OUT_OF_SERVICE || newStatus == DroneStatus.FAULTED) {
             status = newStatus;
 
             String statusMsg =
                     droneId + "," +
-                    status + "," +
-                    posX + "," +
-                    posY + "," +
-                    waterTank;
+                            status + "," +
+                            posX + "," +
+                            posY + "," +
+                            waterTank + "," + currentTask.getFireID();
             sendStatus(statusMsg);
+            sendGuiUpdate("DRONE_FAULTED", currentTask.getZoneID());
             return;
         }
         // we wanna check that the transition is valid, no illegal moves
         // IDLE - > EN_ROUTE -> ARRIVED -> DROPPING_AGENT -> EN_ROUTE or RETURNING -> REFILLING -> IDLE
-        switch (status){
+        switch (status) {
             case IDLE:
                 if (newStatus != DroneStatus.EN_ROUTE && newStatus != DroneStatus.FAULTED) return;
                 break;
             case EN_ROUTE:
                 if (newStatus != DroneStatus.ARRIVED &&
-                        newStatus != DroneStatus.FAULTED ) return;
+                        newStatus != DroneStatus.FAULTED) return;
                 break;
             case ARRIVED:
                 if (newStatus != DroneStatus.DROPPING_AGENT) return;
@@ -253,7 +266,7 @@ public class Drone implements Runnable {
                         status + "," +
                         posX + "," +
                         posY + "," +
-                        waterTank;
+                        waterTank + "," + currentTask.getFireID();
         sendStatus(statusMsg);
     }
 
@@ -295,12 +308,12 @@ public class Drone implements Runnable {
      * easier to log now
      */
     private boolean travelTo(double x, double y) {
-        double distance =  calculateDistanceToZone(x, y);
+        double distance = calculateDistanceToZone(x, y);
 
         double dx = x - posX;
         double dy = y - posY;
 
-        long totalTime =  (long) ((distance / DRONE_SPEED) * 1000);
+        long totalTime = (long) ((distance / DRONE_SPEED) * 1000);
 
         int steps = 10;
         double stepX = dx / steps;
@@ -310,7 +323,7 @@ public class Drone implements Runnable {
         for (int i = 0; i < steps; i++) {
 
             if (injectedFault == FaultType.STUCK_MID_FLIGHT && !faultTriggered
-            && i >= steps / 2) {
+                    && i >= steps / 2) {
                 faultTriggered = true;
                 System.out.println("[Drone " + droneId + "] Fault triggered: stuck mid flight");
 
@@ -324,7 +337,7 @@ public class Drone implements Runnable {
             posX += stepX;
             posY += stepY;
 
-            sendStatus(droneId + "," + status + "," +posX + "," + posY + "," + waterTank);
+            sendStatus(droneId + "," + status + "," + posX + "," + posY + "," + waterTank + "," + currentTask.getFireID());
             sleep((int) stepTime);
         }
 
@@ -343,6 +356,7 @@ public class Drone implements Runnable {
 
     /**
      * Determines the amount of water/agent to dispense based on the fire's severity.
+     *
      * @param severity The severity level of the fire event.
      * @return The integer amount of water units to be used.
      */
@@ -356,6 +370,7 @@ public class Drone implements Runnable {
 
     /**
      * Checks if the drone has enough flight capability (fuel) to continue operating.
+     *
      * @return true if the drone has sufficient fuel, false if it must return to base.
      */
     private boolean remainingFlight() {
@@ -364,13 +379,14 @@ public class Drone implements Runnable {
 
     /**
      * Calculates the travel distance to coordinates x, y
+     *
      * @param x the x coordinate
      * @param y the y coordinate
      * @return the distance to be travelled
      */
     private double calculateDistanceToZone(double x, double y) {
 
-        double dx =  x - posX;
+        double dx = x - posX;
         double dy = y - posY;
 
         return Math.sqrt(dx * dx + dy * dy);  // simple distance model
@@ -379,6 +395,7 @@ public class Drone implements Runnable {
     /**
      * Just had to put this here because I do the calculations yet mb
      * actual times going to be based off one of the drones
+     *
      * @param ms duration to sleep in milliseconds
      */
     protected void sleep(int ms) {
@@ -391,25 +408,38 @@ public class Drone implements Runnable {
 
     /**
      * Returns the X position of the drone
+     *
      * @return double - x coordinate
      */
-    public double getPosX() { return posX; }
+    public double getPosX() {
+        return posX;
+    }
 
     /**
      * Returns the Y position of the drone
+     *
      * @return double - y coordinate
      */
-    public double getPosY() { return posY; }
+    public double getPosY() {
+        return posY;
+    }
 
     /**
      * Returns the status of the drone
+     *
      * @return the drone status DroneStatus.IDLE / EN_ROUTE etc
      */
-    public DroneStatus getStatus() { return status; }
-    public int getWaterTank() { return waterTank; } // optional
+    public DroneStatus getStatus() {
+        return status;
+    }
+
+    public int getWaterTank() {
+        return waterTank;
+    } // optional
 
     /**
      * Sends the status (as a string) of the drone to the Scheduler server
+     *
      * @param statusMsg The status string being sent
      */
     public void sendStatus(String statusMsg) {
@@ -441,13 +471,13 @@ public class Drone implements Runnable {
     public double[] getZoneCenter(int startX, int startY, int endX, int endY) {
         int[] s = {startX, startY};
         int[] e = {endX, endY};
-        return new double[]{ (s[0] + e[0]) / 2.0, (s[1] + e[1]) / 2.0 };
+        return new double[]{(s[0] + e[0]) / 2.0, (s[1] + e[1]) / 2.0};
     }
 
     /**
      * Method to receive fire event on UDP socket from the scheduler and to begin
      * state execution.
-     *
+     * <p>
      * Expected packet format:
      * byte[0] = message type (3 = ASSIGNMENT)
      * byte[1] = zone ID
@@ -463,8 +493,8 @@ public class Drone implements Runnable {
 
         try {
 
-            // FIX 1: increase size from 12 -> 13
-            receivePacket = new DatagramPacket(new byte[13], 13);
+
+            receivePacket = new DatagramPacket(new byte[15], 15);
             sendReceiveSocket.receive(receivePacket);
 
             byte[] data = receivePacket.getData();
@@ -484,8 +514,9 @@ public class Drone implements Runnable {
             // FIX 2: shift all coordinate indices by +1
             int startX = combineBytes(data[5], data[6]);
             int startY = combineBytes(data[7], data[8]);
-            int endX   = combineBytes(data[9], data[10]);
-            int endY   = combineBytes(data[11], data[12]);
+            int endX = combineBytes(data[9], data[10]);
+            int endY = combineBytes(data[11], data[12]);
+            int fireID = combineBytes(data[13], data[14]);
 
             zoneCenter = getZoneCenter(startX, startY, endX, endY);
 
@@ -495,7 +526,7 @@ public class Drone implements Runnable {
 
             System.out.println("[Drone " + droneId + "] Received fire assignment for zone " + zoneID);
 
-            currentTask = new FireEvent(zoneID, taskType, java.time.LocalTime.now(), severity, faultType);
+            currentTask = new FireEvent(zoneID, taskType, java.time.LocalTime.now(), severity, faultType, fireID);
 
             this.faultTriggered = false;
             executeTask();
@@ -507,8 +538,9 @@ public class Drone implements Runnable {
 
     /**
      * Helper function for UDP packet parsing.
+     *
      * @param high upper byte to combine
-     * @param low lower byte to combine
+     * @param low  lower byte to combine
      * @return integer represented by the combined bytes
      */
     private int combineBytes(byte high, byte low) {
@@ -517,7 +549,8 @@ public class Drone implements Runnable {
 
     /**
      * Helper method to change GUI view using UDP packets
-     * @param type event type either "DRONE_DISPATCHED" or "DRONE_RETURNING"
+     *
+     * @param type   event type either "DRONE_DISPATCHED" or "DRONE_RETURNING"
      * @param zoneId int representing zone to which drone is travelling
      */
     private void sendGuiUpdate(String type, int zoneId) {
@@ -537,13 +570,14 @@ public class Drone implements Runnable {
     }
 
     /**
-     *Sends a fault notification to the scheduler over UDP
+     * Sends a fault notification to the scheduler over UDP
      * the message has the format:
      * FAULT,droneId,faultType,posX,posY
+     *
      * @param fault, the fault encountered by the drone
      */
-    private void sendFaultStatus(String fault){
-        String msg =  droneId + "," + status + "," + posX + "," + posY + "," + waterTank;
+    private void sendFaultStatus(String fault) {
+        String msg = "FAULT," + droneId + "," + status + "," + posX + "," + posY + "," + waterTank + "," + currentTask.getFireID();
         System.out.println("Sending fault: " + msg);
 
         byte[] data = msg.getBytes();
@@ -551,15 +585,18 @@ public class Drone implements Runnable {
         try {
             DatagramPacket packet = new DatagramPacket(data, data.length, InetAddress.getLocalHost(), 50000);
             sendReceiveSocket.send(packet);
-        }catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    public static void main(String[] args){
+    public static void main(String[] args) {
         Thread newDrone = new Thread(new Drone(1));
         Thread droneTwo = new Thread(new Drone(2));
+        Thread droneThree = new Thread(new Drone(3));
+
         newDrone.start();
         droneTwo.start();
+        droneThree.start();
     }
 }
