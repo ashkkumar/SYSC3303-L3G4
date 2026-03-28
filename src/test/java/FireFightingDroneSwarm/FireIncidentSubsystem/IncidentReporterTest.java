@@ -139,7 +139,8 @@ class IncidentReporterTest {
                 TaskType.FIRE_DETECTED,
                 LocalTime.of(13, 0),
                 Severity.LOW,
-                FaultType.NONE
+                FaultType.NONE,
+                1
         );
 
         Method sendEvent = IncidentReporter.class.getDeclaredMethod("sendEvent", FireEvent.class);
@@ -151,7 +152,7 @@ class IncidentReporterTest {
         DatagramPacket packet = new DatagramPacket(buf, buf.length);
         receiver.receive(packet);
 
-        assertEquals(12, packet.getLength());
+        assertEquals(15, packet.getLength());
         assertEquals(1, buf[0]); // message type
         assertEquals(3, buf[1]); // zone ID
         assertEquals((byte) Severity.LOW.ordinal(), buf[2]);

@@ -175,7 +175,7 @@ class DroneTest {
 
         TestDrone drone = new TestDrone(1);
 
-        drone.currentTask = new FireEvent(3, TaskType.FIRE_DETECTED, LocalTime.now(), Severity.HIGH, FaultType.STUCK_MID_FLIGHT);
+        drone.currentTask = new FireEvent(3, TaskType.FIRE_DETECTED, LocalTime.now(), Severity.HIGH, FaultType.STUCK_MID_FLIGHT, 1);
         drone.zoneCenter = new double[]{800.0, 0.0};
 
         // setPrivateField(drone, "injectedFault", FaultType.STUCK_MID_FLIGHT);
@@ -209,7 +209,7 @@ class DroneTest {
 
         TestDrone drone = new TestDrone(2);
 
-        drone.currentTask = new FireEvent(4, TaskType.FIRE_DETECTED, LocalTime.now(), Severity.MODERATE, FaultType.NOZZLE_JAM);
+        drone.currentTask = new FireEvent(4, TaskType.FIRE_DETECTED, LocalTime.now(), Severity.MODERATE, FaultType.NOZZLE_JAM,1);
         drone.zoneCenter = new double[]{400.0, 0.0};
 
         setPrivateField(drone, "injectedFault", FaultType.NOZZLE_JAM);
@@ -238,6 +238,15 @@ class DroneTest {
 
         TestDrone drone = new TestDrone(3);
 
+        drone.currentTask = new FireEvent(
+                3,
+                TaskType.FIRE_DETECTED,
+                LocalTime.now(),
+                Severity.LOW,
+                FaultType.PACKET_LOSS,
+                3
+        );
+
         setPrivateField(drone, "injectedFault", FaultType.PACKET_LOSS);
         setPrivateField(drone, "faultTriggered", false);
 
@@ -261,7 +270,7 @@ class DroneTest {
 
         TestDrone drone = new TestDrone(4);
 
-        drone.currentTask = new FireEvent(5, TaskType.FIRE_DETECTED, LocalTime.now(), Severity.LOW, FaultType.NONE);
+        drone.currentTask = new FireEvent(5, TaskType.FIRE_DETECTED, LocalTime.now(), Severity.LOW, FaultType.NONE, 1);
         drone.zoneCenter = new double[]{200.0, 0.0};
 
         setPrivateField(drone, "injectedFault", FaultType.NONE);
@@ -270,7 +279,7 @@ class DroneTest {
         drone.executeTask();
 
         assertEquals(DroneStatus.IDLE, drone.getStatus());
-        assertEquals(80, drone.getWaterTank());
+        assertEquals(100, drone.getWaterTank());
         assertEquals(0.0, drone.getPosX(), 0.001);
         assertEquals(0.0, drone.getPosY(), 0.001);
     }
