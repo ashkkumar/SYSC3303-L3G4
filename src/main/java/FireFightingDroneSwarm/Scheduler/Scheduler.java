@@ -2,6 +2,7 @@ package FireFightingDroneSwarm.Scheduler;
 
 import FireFightingDroneSwarm.DroneSubsystem.Drone;
 import FireFightingDroneSwarm.DroneSubsystem.DroneStatus;
+import FireFightingDroneSwarm.DroneSubsystem.FaultType;
 import FireFightingDroneSwarm.FireIncidentSubsystem.*;
 
 import java.net.*;
@@ -256,17 +257,21 @@ public class Scheduler implements Runnable {
             int endX = zone.getEndCoordinates()[0];
             int endY = zone.getEndCoordinates()[1];
 
-            byte[] data = new byte[12];
+            byte[] data = new byte[13];
 
             data[0] = 3; // message type (assignment)
             data[1] = (byte) event.getZoneID();
             data[2] = (byte) event.getSeverity().ordinal();
             data[3] = (byte) event.getTaskType().ordinal();
 
-            separateBytes(data, 4, startX);
-            separateBytes(data, 6, startY);
-            separateBytes(data, 8, endX);
-            separateBytes(data, 10, endY);
+            // NEW
+            data[4] = (byte) event.getFault().ordinal();
+
+            // shifted coordinates
+            separateBytes(data, 5, startX);
+            separateBytes(data, 7, startY);
+            separateBytes(data, 9, endX);
+            separateBytes(data, 11, endY);
 
             InetAddress droneAddress = drone.getAddress();
             int dronePort = drone.getPort();
@@ -337,6 +342,18 @@ public class Scheduler implements Runnable {
     /**
      * This method handles parsing and instantiation of a FireEvent
      * after a UDP Datagram has been received.
+     *
+     * Expected packet format:
+     * byte[0] = message type (1 = FIRE_EVENT)
+     * byte[1] = zone ID
+     * byte[2] = severity level
+     * byte[3] = task type
+     * byte[4] = fault type
+     * byte[5..6] = zone start X coordinate
+     * byte[7..8] = zone start Y coordinate
+     * byte[9..10] = zone end X coordinate
+     * byte[11..12] = zone end Y coordinate
+     *
      * @param data the byte array from the UDP datagram.
      */
     private void handleFireEvent(byte[] data) {
@@ -344,16 +361,19 @@ public class Scheduler implements Runnable {
         int zoneID = data[1];
         int severityNum = data[2];
         int taskNum = data[3];
+        int faultNum = data[4];
 
-        int startX = combineBytes(data[4], data[5]);
-        int startY = combineBytes(data[6], data[7]);
-        int endX   = combineBytes(data[8], data[9]);
-        int endY   = combineBytes(data[10], data[11]);
+        // shifted all indices by +1 after inserting faultType
+        int startX = combineBytes(data[5], data[6]);
+        int startY = combineBytes(data[7], data[8]);
+        int endX   = combineBytes(data[9], data[10]);
+        int endY   = combineBytes(data[11], data[12]);
 
         Severity severity = Severity.values()[severityNum];
         TaskType taskType = TaskType.values()[taskNum];
+        FaultType faultType = FaultType.values()[faultNum];
 
-        FireEvent event = new FireEvent(zoneID, taskType, LocalTime.now(), severity);
+        FireEvent event = new FireEvent(zoneID, taskType, LocalTime.now(), severity, faultType);
 
         try {
             put(event);
@@ -400,7 +420,56 @@ public class Scheduler implements Runnable {
             System.out.println("[Scheduler] Registered Drone " + droneId);
 
         } else {
-            drone.update(status, posX, posY, water);
+
+
+            switch (status) {
+                case FAULTED:
+
+                    drone.update(DroneStatus.FAULTED, posX, posY, water);
+
+                    if (currentEvent != null) {
+                        // CREATE NEW OBJECT (important)
+                        FireEvent failed = new FireEvent(
+                                currentEvent.getZoneID(),
+                                currentEvent.getTaskType(),
+                                LocalTime.now(),
+                                currentEvent.getSeverity(),
+                                FaultType.NONE
+                        );
+
+                        try {
+                            put(failed);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                    break;
+
+                case OUT_OF_SERVICE:
+                    drone.update(status, posX, posY, water);
+                    if (currentEvent != null) {
+                        // CREATE NEW OBJECT (important)
+                        FireEvent failed = new FireEvent(
+                                currentEvent.getZoneID(),
+                                currentEvent.getTaskType(),
+                                LocalTime.now(),
+                                currentEvent.getSeverity(),
+                                FaultType.NONE
+                        );
+
+                        try {
+                            put(failed);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        break;
+                    }
+                default:
+                    drone.update(status, posX, posY, water);
+                    break;
+            }
+
+
         }
 
         System.out.println("[Scheduler] Drone " + droneId +

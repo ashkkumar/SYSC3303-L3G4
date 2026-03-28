@@ -1,5 +1,6 @@
 package FireFightingDroneSwarm.FireIncidentSubsystem;
 
+import FireFightingDroneSwarm.DroneSubsystem.FaultType;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalTime;
@@ -15,7 +16,7 @@ class FireEventTest {
     @Test
     void TestGetZoneID() {
         FireEvent e = new FireEvent(3, TaskType.FIRE_DETECTED,
-                LocalTime.of(14, 3, 15), Severity.HIGH);
+                LocalTime.of(14, 3, 15), Severity.HIGH, FaultType.NONE);
 
         assertEquals(3, e.getZoneID());
     }
@@ -27,7 +28,7 @@ class FireEventTest {
     @Test
     void TestGetTaskType() {
         FireEvent e = new FireEvent(3, TaskType.FIRE_DETECTED,
-                LocalTime.of(14, 3, 15), Severity.HIGH);
+                LocalTime.of(14, 3, 15), Severity.HIGH, FaultType.NONE);
 
         assertEquals(TaskType.FIRE_DETECTED, e.getTaskType());
     }
@@ -39,7 +40,7 @@ class FireEventTest {
     @Test
     void TestGetTimestamp() {
         LocalTime t = LocalTime.of(14, 3, 15);
-        FireEvent e = new FireEvent(3, TaskType.FIRE_DETECTED, t, Severity.HIGH);
+        FireEvent e = new FireEvent(3, TaskType.FIRE_DETECTED, t, Severity.HIGH, FaultType.NONE);
 
         assertEquals(t, e.getTimestamp());
     }
@@ -51,7 +52,7 @@ class FireEventTest {
     @Test
     void TestGetSeverity() {
         FireEvent e = new FireEvent(3, TaskType.FIRE_DETECTED,
-                LocalTime.of(14, 3, 15), Severity.HIGH);
+                LocalTime.of(14, 3, 15), Severity.HIGH, FaultType.NONE);
 
         assertEquals(Severity.HIGH, e.getSeverity());
     }
@@ -64,7 +65,7 @@ class FireEventTest {
     @Test
     void TestToString() {
         FireEvent e = new FireEvent(7, TaskType.DRONE_REQUESTED,
-                LocalTime.of(14, 10), Severity.MODERATE);
+                LocalTime.of(14, 10), Severity.MODERATE, FaultType.NONE);
 
         String s = e.toString();
 

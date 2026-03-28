@@ -1,5 +1,6 @@
 package FireFightingDroneSwarm.Scheduler;
 
+import FireFightingDroneSwarm.DroneSubsystem.FaultType;
 import FireFightingDroneSwarm.FireIncidentSubsystem.FireEvent;
 import FireFightingDroneSwarm.FireIncidentSubsystem.Severity;
 import FireFightingDroneSwarm.FireIncidentSubsystem.TaskType;
@@ -69,7 +70,7 @@ class SchedulerTest {
         scheduler.setZoneIDs(zones);
 
         // Put one event so get() can actually remove it (and then see buffer empty)
-        FireEvent e1 = new FireEvent(1, TaskType.FIRE_DETECTED, LocalTime.of(13, 0), Severity.LOW);
+        FireEvent e1 = new FireEvent(1, TaskType.FIRE_DETECTED, LocalTime.of(13, 0), Severity.LOW, FaultType.NONE);
         scheduler.put(e1);
 
         // Now declare no more tasks will arrive
@@ -144,7 +145,8 @@ class SchedulerTest {
                 1,
                 TaskType.FIRE_DETECTED,
                 LocalTime.now(),
-                Severity.HIGH
+                Severity.HIGH,
+                FaultType.NONE
         );
         scheduler.put(event);
         scheduler.assignDroneEvent();
