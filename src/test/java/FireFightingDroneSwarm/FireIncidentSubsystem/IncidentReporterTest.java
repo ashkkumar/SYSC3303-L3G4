@@ -1,5 +1,6 @@
 package FireFightingDroneSwarm.FireIncidentSubsystem;
 
+import FireFightingDroneSwarm.DroneSubsystem.FaultType;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
@@ -137,7 +138,8 @@ class IncidentReporterTest {
                 3,
                 TaskType.FIRE_DETECTED,
                 LocalTime.of(13, 0),
-                Severity.LOW
+                Severity.LOW,
+                FaultType.NONE
         );
 
         Method sendEvent = IncidentReporter.class.getDeclaredMethod("sendEvent", FireEvent.class);

@@ -175,10 +175,10 @@ class DroneTest {
 
         TestDrone drone = new TestDrone(1);
 
-        drone.currentTask = new FireEvent(3, TaskType.FIRE_DETECTED, LocalTime.now(), Severity.HIGH);
+        drone.currentTask = new FireEvent(3, TaskType.FIRE_DETECTED, LocalTime.now(), Severity.HIGH, FaultType.STUCK_MID_FLIGHT);
         drone.zoneCenter = new double[]{800.0, 0.0};
 
-        setPrivateField(drone, "injectedFault", FaultType.STUCK_MID_FLIGHT);
+        // setPrivateField(drone, "injectedFault", FaultType.STUCK_MID_FLIGHT);
         setPrivateField(drone, "faultTriggered", false);
 
         drone.executeTask();
@@ -200,7 +200,7 @@ class DroneTest {
 
         TestDrone drone = new TestDrone(2);
 
-        drone.currentTask = new FireEvent(4, TaskType.FIRE_DETECTED, LocalTime.now(), Severity.MODERATE);
+        drone.currentTask = new FireEvent(4, TaskType.FIRE_DETECTED, LocalTime.now(), Severity.MODERATE, FaultType.NOZZLE_JAM);
         drone.zoneCenter = new double[]{400.0, 0.0};
 
         setPrivateField(drone, "injectedFault", FaultType.NOZZLE_JAM);
@@ -252,7 +252,7 @@ class DroneTest {
 
         TestDrone drone = new TestDrone(4);
 
-        drone.currentTask = new FireEvent(5, TaskType.FIRE_DETECTED, LocalTime.now(), Severity.LOW);
+        drone.currentTask = new FireEvent(5, TaskType.FIRE_DETECTED, LocalTime.now(), Severity.LOW, FaultType.NONE);
         drone.zoneCenter = new double[]{200.0, 0.0};
 
         setPrivateField(drone, "injectedFault", FaultType.NONE);
