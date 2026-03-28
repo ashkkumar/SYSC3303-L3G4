@@ -23,7 +23,9 @@ public class Scheduler implements Runnable {
     private boolean allTasksProcessed;
     private Map<Integer, Zone> zoneIDs;
     private Map<Integer, DroneState> droneStates = new HashMap<>();
-    private FireEvent currentEvent;
+    private final Map<Integer, FireEvent> activeAssignments = new HashMap<>();
+    private final Map<Integer, Long> assignmentStartTimes = new HashMap<>();
+    //private FireEvent currentEvent;
     private DatagramSocket socket;
     private DatagramPacket receivePacket;
 
@@ -107,7 +109,7 @@ public class Scheduler implements Runnable {
             return null;
         }
 
-        FireEvent fireEvent = null;
+        FireEvent fireEvent = buffer.poll();
         if(this.getAllTasksSent() && buffer.isEmpty()) {
             this.allTasksProcessed = true;
         }
@@ -210,7 +212,10 @@ public class Scheduler implements Runnable {
                     + " to Zone "
                     + bestEvent.getZoneID());
 
-           this.currentEvent = bestEvent;
+            activeAssignments.put(bestDrone.getDroneId(), bestEvent);
+            assignmentStartTimes.put(bestDrone.getDroneId(), System.currentTimeMillis());
+
+           //this.currentEvent = bestEvent;
            this.sendFireEventToDrone(bestDrone, bestEvent);
         }
     }
@@ -404,6 +409,11 @@ public class Scheduler implements Runnable {
             return;
         }
 
+        if (parts[0].equals("FAULT")) {
+            System.out.println("[Scheduler] Received explicit fault packet: " + message);
+            return;
+        }
+
         int droneId = Integer.parseInt(parts[0]);
         DroneStatus status = DroneStatus.valueOf(parts[1]);
         double posX = Double.parseDouble(parts[2]);
@@ -420,56 +430,38 @@ public class Scheduler implements Runnable {
             System.out.println("[Scheduler] Registered Drone " + droneId);
 
         } else {
+            drone.update(status, posX, posY, water);
+        }
 
+        switch(status) {
+            case FAULTED:
+            case OUT_OF_SERVICE: {
+                FireEvent assignedEvent = activeAssignments.remove(droneId);
+                assignmentStartTimes.remove(droneId);
 
-            switch (status) {
-                case FAULTED:
+                if (assignedEvent != null) {
+                    FireEvent failed = new FireEvent(
+                            assignedEvent.getZoneID(),
+                            assignedEvent.getTaskType(),
+                            LocalTime.now(),
+                            assignedEvent.getSeverity(),
+                            FaultType.NONE
+                    );
 
-                    drone.update(DroneStatus.FAULTED, posX, posY, water);
-
-                    if (currentEvent != null) {
-                        // CREATE NEW OBJECT (important)
-                        FireEvent failed = new FireEvent(
-                                currentEvent.getZoneID(),
-                                currentEvent.getTaskType(),
-                                LocalTime.now(),
-                                currentEvent.getSeverity(),
-                                FaultType.NONE
-                        );
-
-                        try {
-                            put(failed);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
+                    try {
+                        put(failed);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
                     }
-                    break;
-
-                case OUT_OF_SERVICE:
-                    drone.update(status, posX, posY, water);
-                    if (currentEvent != null) {
-                        // CREATE NEW OBJECT (important)
-                        FireEvent failed = new FireEvent(
-                                currentEvent.getZoneID(),
-                                currentEvent.getTaskType(),
-                                LocalTime.now(),
-                                currentEvent.getSeverity(),
-                                FaultType.NONE
-                        );
-
-                        try {
-                            put(failed);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                        break;
-                    }
-                default:
-                    drone.update(status, posX, posY, water);
-                    break;
+                }
+                break;
             }
-
-
+            case IDLE:
+                activeAssignments.remove(droneId);
+                assignmentStartTimes.remove(droneId);
+                break;
+            default:
+                break;
         }
 
         System.out.println("[Scheduler] Drone " + droneId +
@@ -526,9 +518,9 @@ public class Scheduler implements Runnable {
      * Helper method to test scheduler algorithm assigns priorities correctly.
      * @return current highest priority FireEvent
      */
-    public FireEvent getCurrentEvent(){
-        return this.currentEvent;
-    }
+    //public FireEvent getCurrentEvent(){
+        //return this.currentEvent;
+    //}
 
     /**
      * Helper function to initialize zone map within the class, now that

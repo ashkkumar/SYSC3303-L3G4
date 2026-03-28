@@ -183,8 +183,17 @@ class DroneTest {
 
         drone.executeTask();
 
-        assertEquals(DroneStatus.FAULTED, drone.getStatus());
-        assertTrue(drone.getPosX() > 0 && drone.getPosX() < 800.0);
+        assertTrue((boolean) getPrivateField(drone, "faultTriggered"),
+                "Fault should have been triggered during travel.");
+
+        assertEquals(DroneStatus.IDLE, drone.getStatus(),
+                "Recoverable stuck-mid-flight fault should return the drone to IDLE after recovery.");
+
+        assertEquals(0.0, drone.getPosX(), 0.001,
+                "Drone should return to base X position after recovery.");
+
+        assertEquals(0.0, drone.getPosY(), 0.001,
+                "Drone should return to base Y position after recovery.");
     }
 
     /**

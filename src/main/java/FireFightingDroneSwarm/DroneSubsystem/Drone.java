@@ -35,7 +35,6 @@ public class Drone implements Runnable {
     //Drone zone
     private int zone;
 
-    // Base position (choose whatever your sim assumes; often 0,0)
     private static final double BASE_X = 0;
     private static final double BASE_Y = 0;
 
@@ -139,10 +138,18 @@ public class Drone implements Runnable {
         if (!arrived) {
             transition(DroneStatus.RETURNING);
             this.sendGuiUpdate("DRONE_RETURNING", currentTask.getZoneID());
+
+            if (zoneMapController != null) {
+                zoneMapController.droneReturning(currentTask.getZoneID());
+            }
+
             boolean returned = travelTo(BASE_X, BASE_Y);
             if (!returned) {
                 return;
             }
+            transition(DroneStatus.REFILLING);
+            refill();
+
             transition(DroneStatus.IDLE);
             System.out.println("[Drone " + droneId + "] returned to base");
 
@@ -205,7 +212,7 @@ public class Drone implements Runnable {
     synchronized void transition(DroneStatus newStatus) {
         System.out.println("[Drone " + droneId + " " + status + "] Transitioning to " + newStatus);
 
-        if ( newStatus == DroneStatus.OUT_OF_SERVICE) {
+        if ( newStatus == DroneStatus.OUT_OF_SERVICE || newStatus == DroneStatus.FAULTED) {
             status = newStatus;
 
             String statusMsg =
@@ -543,7 +550,7 @@ public class Drone implements Runnable {
      * @param fault, the fault encountered by the drone
      */
     private void sendFaultStatus(String fault){
-        String msg =  droneId + "," + status + "," + posX + "," + posY + "," + waterTank;
+        String msg =  "FAULT," + droneId + "," + status + "," + posX + "," + posY + "," + waterTank;
         System.out.println("Sending fault: " + msg);
 
         byte[] data = msg.getBytes();
