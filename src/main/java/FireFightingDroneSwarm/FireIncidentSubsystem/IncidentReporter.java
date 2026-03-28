@@ -149,15 +149,16 @@ public class IncidentReporter implements Runnable {
     /**
      * Sends a fire event to the Scheduler subsystem using a UDP packet.
      * The packet format is a simple byte array where:
-     * byte[0] = message type (1 = FIRE_EVENT) we can change this tho just
-     * leaving it as a number rn
+     * byte[0] = message type (1 = FIRE_EVENT)
      * byte[1] = zone ID
      * byte[2] = severity level
      * byte[3] = task type
-     * byte[4..5] = zone start X coordinate
-     * byte[6..7] = zone start Y coordinate
-     * byte[8..9] = zone end X coordinate
-     * byte[10..11] = zone end Y coordinate
+     * byte[4] = fault type
+     * byte[5..6] = zone start X coordinate
+     * byte[7..8] = zone start Y coordinate
+     * byte[9..10] = zone end X coordinate
+     * byte[11..12] = zone end Y coordinate
+     *
      * This method replaces the direct Scheduler method calls used in
      * previous iterations. Instead of calling scheduler.put(event),
      * the event is serialized into a byte array and transmitted over
@@ -166,53 +167,59 @@ public class IncidentReporter implements Runnable {
      * @param event the FireEvent object that should be reported to the Scheduler
      */
     private void sendEvent(FireEvent event){
-            try {
-                Zone zone = getZoneById(event.getZoneID());
+        try {
+            Zone zone = getZoneById(event.getZoneID());
 
-                if(zone == null){
-                    System.out.println("[Incident Subsystem] Zone " + event.getZoneID() + " not found");
-                    return;
-                }
+            if(zone == null){
+                System.out.println("[Incident Subsystem] Zone " + event.getZoneID() + " not found");
+                return;
+            }
 
-                // get the x,y coordinates for start and end positions to send over udp
-                int startX = zone.getStartCoordinates()[0];
-                int startY = zone.getStartCoordinates()[1];
-                int endX   = zone.getEndCoordinates()[0];
-                int endY   = zone.getEndCoordinates()[1];
+            // get the x,y coordinates for start and end positions to send over udp
+            int startX = zone.getStartCoordinates()[0];
+            int startY = zone.getStartCoordinates()[1];
+            int endX   = zone.getEndCoordinates()[0];
+            int endY   = zone.getEndCoordinates()[1];
 
-                byte[] data = new byte[12];
+            // increased size from 12 -> 13 due to added fault type byte
+            byte[] data = new byte[13];
 
-                // data[0] = message type as an int (we can change this)
-                data[0] = 1;
+            // data[0] = message type
+            data[0] = 1;
 
-                // data[1] = zone id
-                data[1] = (byte) event.getZoneID();
+            // data[1] = zone id
+            data[1] = (byte) event.getZoneID();
 
-                // data[2] = severity and data[3] = task type
-                data[2] = (byte) event.getSeverity().ordinal();
-                data[3] = (byte) event.getTaskType().ordinal();
+            // data[2] = severity, data[3] = task type
+            data[2] = (byte) event.getSeverity().ordinal();
+            data[3] = (byte) event.getTaskType().ordinal();
 
-                // data[4..5] = startX coordinate
-                separateBytes(data, 4, startX);
+            // data[4] = fault type
+            data[4] = (byte) event.getFault().ordinal();
 
-                // data[6..7] = startY coordinate
-                separateBytes(data, 6, startY);
+            // data[5..6] = startX coordinate
+            separateBytes(data, 5, startX);
 
-                // data[8..9] = endX coordinate
-                separateBytes(data, 8, endX);
+            // data[7..8] = startY coordinate
+            separateBytes(data, 7, startY);
 
-                // data[10..11] = endY coordinate
-                separateBytes(data, 10, endY);
+            // data[9..10] = endX coordinate
+            separateBytes(data, 9, endX);
 
-                DatagramPacket packet = new DatagramPacket(data, data.length, schedulerIP, schedulerPort);
-                String guiMessage = "FIRE_EVENT," + event.getZoneID();
-                byte[] guiBytes = guiMessage.getBytes();
-                DatagramPacket guiPacket = new DatagramPacket(guiBytes, guiBytes.length, InetAddress.getLocalHost(), 60000);
-                socket.send(packet);
-                socket.send(guiPacket);
+            // data[11..12] = endY coordinate
+            separateBytes(data, 11, endY);
 
-                System.out.println("[Incident Subsystem] Sent event " + event.getZoneID() + " " + event.getSeverity());
-            } catch (Exception e) {
+            DatagramPacket packet = new DatagramPacket(data, data.length, schedulerIP, schedulerPort);
+
+            String guiMessage = "FIRE_EVENT," + event.getZoneID();
+            byte[] guiBytes = guiMessage.getBytes();
+            DatagramPacket guiPacket = new DatagramPacket(guiBytes, guiBytes.length, InetAddress.getLocalHost(), 60000);
+
+            socket.send(packet);
+            socket.send(guiPacket);
+
+            System.out.println("[Incident Subsystem] Sent event " + event.getZoneID() + " " + event.getSeverity());
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }

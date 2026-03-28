@@ -1,4 +1,5 @@
 package FireFightingDroneSwarm.FireIncidentSubsystem;
+import FireFightingDroneSwarm.DroneSubsystem.FaultType;
 import FireFightingDroneSwarm.Scheduler.Scheduler;
 import java.time.LocalTime;
 
@@ -13,6 +14,7 @@ public class FireEvent {
     private LocalTime timestamp;
     private Severity severity;
     private Scheduler scheduler;
+    private FaultType fault;
 
     /**
      * Constructor for a FireEvent object, to represent incoming fire events.
@@ -21,11 +23,12 @@ public class FireEvent {
      * @param timestamp LocalTime representation of timestamp
      * @param severity enum value of Severity
      */
-    public FireEvent(int zone, TaskType taskType, LocalTime timestamp, Severity severity) {
+    public FireEvent(int zone, TaskType taskType, LocalTime timestamp, Severity severity, FaultType fault) {
         this.zoneID = zone;
         this.taskType = taskType;
         this.timestamp = timestamp;
         this.severity = severity;
+        this.fault = fault;
     }
 
     /**
@@ -60,12 +63,21 @@ public class FireEvent {
         return severity;
     }
 
+
+    public FaultType getFault() {return  fault;}
+
+    /**
+     * Setter for fault, important for scheduler to readd fire event
+     * @param fault
+     */
+    public void setFault(FaultType fault) {this.fault=fault;}
+
     /**
      * Override toString() method to return a representation of this event and its fields
      * @return String representation of this event
      */
     public String toString() {
         return "FireEvent [zoneID=" + zoneID + ", taskType=" + taskType + ", timestamp=" +
-                timestamp + ", severity=" + severity + "]";
+                timestamp + ", severity=" + severity + ", fault=" + fault + "]";
     }
 }

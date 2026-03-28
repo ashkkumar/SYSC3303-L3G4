@@ -1,12 +1,9 @@
 package FireFightingDroneSwarm.DroneSubsystem;
-import FireFightingDroneSwarm.Events.EventLogger;
 import FireFightingDroneSwarm.FireIncidentSubsystem.FireEvent;
 import FireFightingDroneSwarm.FireIncidentSubsystem.Severity;
-import FireFightingDroneSwarm.FireIncidentSubsystem.Zone;
 import FireFightingDroneSwarm.Scheduler.Scheduler;
 import FireFightingDroneSwarm.UserInterface.ZoneMapController;
 import FireFightingDroneSwarm.FireIncidentSubsystem.TaskType;
-import FireFightingDroneSwarm.UserInterface.ZoneMapView;
 
 import java.io.IOException;
 import java.net.*;
@@ -25,6 +22,7 @@ public class Drone implements Runnable {
     double[] zoneCenter = new double[2];
     private FaultType injectedFault = FaultType.NONE;
     private boolean faultTriggered = false;
+    private int faultSleepTime = 2000;
 
     //UDP
     DatagramPacket sendPacket, receivePacket;
@@ -94,7 +92,7 @@ public class Drone implements Runnable {
     @Override
     public void run() {
 
-        while (true) {
+        while (status != DroneStatus.OUT_OF_SERVICE) {
             try {
                 String statusMsg =
                         droneId + "," +
@@ -135,8 +133,19 @@ public class Drone implements Runnable {
             zoneMapController.droneDispatched(currentTask.getZoneID());
         }
 
+        injectedFault = currentTask.getFault();
+
         boolean arrived = travelTo(targetX, targetY);
         if (!arrived) {
+            transition(DroneStatus.RETURNING);
+            this.sendGuiUpdate("DRONE_RETURNING", currentTask.getZoneID());
+            boolean returned = travelTo(BASE_X, BASE_Y);
+            if (!returned) {
+                return;
+            }
+            transition(DroneStatus.IDLE);
+            System.out.println("[Drone " + droneId + "] returned to base");
+
             return;
         }
         transition(DroneStatus.ARRIVED);
@@ -145,6 +154,7 @@ public class Drone implements Runnable {
         boolean success = extinguish(currentTask.getSeverity());
 
         if (!success) {
+            System.out.println("Drone Couldn't drop agent, Fault occured");
             return;
         }
 
@@ -195,7 +205,7 @@ public class Drone implements Runnable {
     synchronized void transition(DroneStatus newStatus) {
         System.out.println("[Drone " + droneId + " " + status + "] Transitioning to " + newStatus);
 
-        if (newStatus == DroneStatus.FAULTED || newStatus == DroneStatus.OUT_OF_SERVICE) {
+        if ( newStatus == DroneStatus.OUT_OF_SERVICE) {
             status = newStatus;
 
             String statusMsg =
@@ -211,10 +221,11 @@ public class Drone implements Runnable {
         // IDLE - > EN_ROUTE -> ARRIVED -> DROPPING_AGENT -> EN_ROUTE or RETURNING -> REFILLING -> IDLE
         switch (status){
             case IDLE:
-                if (newStatus != DroneStatus.EN_ROUTE) return;
+                if (newStatus != DroneStatus.EN_ROUTE && newStatus != DroneStatus.FAULTED) return;
                 break;
             case EN_ROUTE:
-                if  (newStatus != DroneStatus.ARRIVED) return;
+                if (newStatus != DroneStatus.ARRIVED &&
+                        newStatus != DroneStatus.FAULTED ) return;
                 break;
             case ARRIVED:
                 if (newStatus != DroneStatus.DROPPING_AGENT) return;
@@ -224,12 +235,14 @@ public class Drone implements Runnable {
                         newStatus != DroneStatus.EN_ROUTE) return;
                 break;
             case RETURNING:
-                if (newStatus != DroneStatus.REFILLING) return;
+                if (newStatus != DroneStatus.REFILLING && newStatus != DroneStatus.FAULTED) return;
                 break;
             case REFILLING:
                 if (newStatus != DroneStatus.IDLE) return;
                 break;
             case FAULTED:
+                if (newStatus != DroneStatus.RETURNING) return;
+                break;
             case OUT_OF_SERVICE:
                 return;
         }
@@ -247,6 +260,7 @@ public class Drone implements Runnable {
     /**
      * Simulates fire extinguishing time based on fire severity.
      * Now if theres a fault detected with the nozzle it'll put the drone out of service
+     *
      * @param severity the severity level of the fire
      */
     private boolean extinguish(Severity severity) {
@@ -302,6 +316,8 @@ public class Drone implements Runnable {
 
                 transition(DroneStatus.FAULTED);
                 sendFaultStatus("STUCK_MID_FLIGHT");
+
+                sleep(faultSleepTime);
 
                 return false;
             }
@@ -430,13 +446,25 @@ public class Drone implements Runnable {
 
     /**
      * Method to receive fire event on UDP socket from the scheduler and to begin
-     * state execution
+     * state execution.
+     *
+     * Expected packet format:
+     * byte[0] = message type (3 = ASSIGNMENT)
+     * byte[1] = zone ID
+     * byte[2] = severity level
+     * byte[3] = task type
+     * byte[4] = fault type
+     * byte[5..6] = zone start X coordinate
+     * byte[7..8] = zone start Y coordinate
+     * byte[9..10] = zone end X coordinate
+     * byte[11..12] = zone end Y coordinate
      */
     public void receiveFireEvent() {
 
         try {
 
-            receivePacket = new DatagramPacket(new byte[12], 12);
+            // FIX 1: increase size from 12 -> 13
+            receivePacket = new DatagramPacket(new byte[13], 13);
             sendReceiveSocket.receive(receivePacket);
 
             byte[] data = receivePacket.getData();
@@ -447,22 +475,27 @@ public class Drone implements Runnable {
                 return; // not a fire event assignment
             }
 
-            int zoneID = data[1];
-            int severityNum = data[2];
-            int taskNum = data[3];
+            // (optional safer parsing)
+            int zoneID = data[1] & 0xFF;
+            int severityNum = data[2] & 0xFF;
+            int taskNum = data[3] & 0xFF;
+            int faultNum = data[4] & 0xFF;
 
-            int startX = combineBytes(data[4], data[5]);
-            int startY = combineBytes(data[6], data[7]);
-            int endX   = combineBytes(data[8], data[9]);
-            int endY   = combineBytes(data[10], data[11]);
+            // FIX 2: shift all coordinate indices by +1
+            int startX = combineBytes(data[5], data[6]);
+            int startY = combineBytes(data[7], data[8]);
+            int endX   = combineBytes(data[9], data[10]);
+            int endY   = combineBytes(data[11], data[12]);
+
             zoneCenter = getZoneCenter(startX, startY, endX, endY);
 
             Severity severity = Severity.values()[severityNum];
             TaskType taskType = TaskType.values()[taskNum];
+            FaultType faultType = FaultType.values()[faultNum];
 
             System.out.println("[Drone " + droneId + "] Received fire assignment for zone " + zoneID);
 
-            currentTask = new FireEvent(zoneID, taskType, java.time.LocalTime.now(), severity);
+            currentTask = new FireEvent(zoneID, taskType, java.time.LocalTime.now(), severity, faultType);
 
             this.faultTriggered = false;
             executeTask();
@@ -470,7 +503,6 @@ public class Drone implements Runnable {
         } catch (Exception e) {
             e.printStackTrace();
         }
-
     }
 
     /**
@@ -511,7 +543,7 @@ public class Drone implements Runnable {
      * @param fault, the fault encountered by the drone
      */
     private void sendFaultStatus(String fault){
-        String msg =  "FAULT," + droneId + "," + fault + "," + posX + "," + posY;
+        String msg =  droneId + "," + status + "," + posX + "," + posY + "," + waterTank;
         System.out.println("Sending fault: " + msg);
 
         byte[] data = msg.getBytes();

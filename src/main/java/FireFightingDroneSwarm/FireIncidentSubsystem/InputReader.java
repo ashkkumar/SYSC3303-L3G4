@@ -1,5 +1,7 @@
 package FireFightingDroneSwarm.FireIncidentSubsystem;
 
+import FireFightingDroneSwarm.DroneSubsystem.FaultType;
+
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -54,6 +56,7 @@ public class InputReader {
                     int zoneID = Integer.parseInt(tokens[1]);
                     TaskType taskType = null;
                     Severity severity = null;
+                    FaultType fault = null;
 
                     switch (tokens[2]) {
                         case "DRONE_REQUEST":
@@ -76,8 +79,23 @@ public class InputReader {
                             break;
                     }
 
+                    switch (tokens[4]) {
+                        case "NONE":
+                            fault = FaultType.NONE;
+                            break;
+                        case "STUCK_MID_FLIGHT":
+                            fault = FaultType.STUCK_MID_FLIGHT;
+                            break;
+                        case "NOZZLE_JAM":
+                            fault = FaultType.NOZZLE_JAM;
+                            break;
+                        case "PACKET_LOSS":
+                            fault = FaultType.PACKET_LOSS;
+                            break;
+                    }
+
                     FireEvent event =
-                            new FireEvent(zoneID, taskType, timestamp, severity);
+                            new FireEvent(zoneID, taskType, timestamp, severity, fault);
                     events.add(event);
                 }
             }
