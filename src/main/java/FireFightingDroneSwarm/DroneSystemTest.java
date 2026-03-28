@@ -40,11 +40,9 @@ public class DroneSystemTest {
         scheduler.setZoneIDs(buildZoneMap(zones));
 
         EventLogger logger = new EventLogger(5000);
-        // IncidentReporter incidentReporter = new IncidentReporter(inputReader, scheduler, controller);
-        IncidentReporter incidentReporter = new IncidentReporter(inputReader, scheduler, controller, logger);
+        IncidentReporter incidentReporter = new IncidentReporter(inputReader, scheduler, controller);
 
-        Drone drone = new Drone(1, scheduler, controller, logger);
-        //Drone drone = new Drone(1, scheduler, controller);
+        Drone drone = new Drone(1, scheduler, controller);
 
         scheduler.setIncidentReporter(incidentReporter);
 

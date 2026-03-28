@@ -29,7 +29,6 @@ public class IncidentReporter implements Runnable {
     private DatagramSocket socket;
     private InetAddress schedulerIP;
     private int schedulerPort = 50000;
-    private EventLogger logger;
 
     /**
      * Constructor for this object, takes in an instantiated InputReader
@@ -37,13 +36,12 @@ public class IncidentReporter implements Runnable {
      * @param inputReader InputReader with file fields instantiated
      * @param scheduler Scheduler object for event sharing
      */
-    public IncidentReporter(InputReader inputReader, Scheduler scheduler, ZoneMapController zoneMapController, EventLogger logger) {
+    public IncidentReporter(InputReader inputReader, Scheduler scheduler, ZoneMapController zoneMapController) {
         this.inputReader = inputReader;
         this.scheduler = scheduler;
         this.zoneMapController = zoneMapController;
         nextEvent = 0;
         this.initializeSystem();
-        this.logger = logger;
     }
 
     /**
@@ -110,7 +108,6 @@ public class IncidentReporter implements Runnable {
     public void run() {
         while(nextEvent < events.size()){
             FireEvent event = events.get(nextEvent);
-            logger.Log("Incident Reporter", "FIRE", "Fire Detected");
             try {
                 sendEvent(event);
                 if (zoneMapController != null) {
@@ -234,7 +231,6 @@ public class IncidentReporter implements Runnable {
             DatagramPacket packet = new DatagramPacket(data, data.length, schedulerIP, schedulerPort);
             socket.send(packet);
             System.out.println("[Incident Subsystem] Sent all events " + events.size());
-            logger.Log("Incident Reporter", "CLEAR", "All Events sent");
         } catch (Exception e){
             e.printStackTrace();
         }
@@ -279,6 +275,7 @@ public class IncidentReporter implements Runnable {
     }
 
     public static void main(String[] args) {
+        EventLogger logger = new EventLogger(1000);
         InputReader inputReader =
                 new InputReader("sample_event_multiple.csv",
                         "sample_zone_multiple.csv");
