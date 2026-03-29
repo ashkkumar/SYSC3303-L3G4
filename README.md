@@ -25,7 +25,7 @@ The project emphasizes:
 
 - `Drone` – Active thread representing a drone  
 - `DroneStatus` – Enum representing drone states (IDLE, EN_ROUTE, REFILLING, etc)
-
+- `DroneFault` - Enum representing the drone faults
 #### Fire Incident Subsystem (`FireIncidentSubsystem`)
 - `FireEvent` – Represents a fire incident  
 - `InputReader` – Parses zone and event CSV files  
@@ -38,7 +38,8 @@ The project emphasizes:
 - Acts as the communication hub between subsystems  
 - Buffers fire events and dispatches tasks to drones  
 - Receives task completion confirmations
-- `DroneStatus` - represents a Drone's state to schedule via UDP 
+- `DroneStatus` - represents a Drone's state to schedule via UDP
+- Reassigns faulted drones
 
 #### User Interface (`UserInterface`)
 - `UDPZoneMapController` - UDP wrapper for ZoneMapController 
@@ -77,7 +78,7 @@ Or build directly through your IDE.
 
 
 ## Testing
-System-level testing for Iteration 2 is performed through the DroneSystemTest.java class, running this file will execute the main() and perform the tests. This is in addition to individual junit testing classes.
+System-level testing for Iteration 4 is performed through the DroneSystemTest.java class, running this file will execute the main() and perform the tests. This is in addition to individual junit testing classes.
 A single test function is used multipleIncidents() in DroneSystemTest.java.
 Multiple test scenarios are executed using different input CSV files to validate:
 - Subsystem communication
@@ -87,7 +88,7 @@ Multiple test scenarios are executed using different input CSV files to validate
 - Junit tests are available as well for the DroneSubsystem, FireIncidentSubsystem, and Scheduler. To execute these tests open the junit test file (for example DroneTest.java) in Intellij and click the execute button.
 
 ## Responsibility Breakdown
-- Ashwin Kumar – UDP communication for IncidentReporter, JUnit tests 
-- Maryam Manjra – User interface update, Scheduling logic, UDP for scheduler 
-- Jason Keah – Drone UDP, Drone JUnit tests
-- Abhiram Sureshkumar – User interface update 
+- Ashwin Kumar – Drone fault injection/logic, Scheduler handling of faults, JUnit tests 
+- Maryam Manjra – User interface update, Scheduler handling of faults, Drone faults logic
+- Jason Keah – Scheduler handling of faults, JUnit tests
+- Abhiram Sureshkumar – Diagrams (timing & state), event logger

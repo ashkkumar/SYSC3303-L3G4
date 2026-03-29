@@ -357,6 +357,7 @@ public class Drone implements Runnable {
      */
     private void refill() {
         sleep(2000);
+        waterTank = MAX_TANK;
     }
 
     /**
@@ -449,9 +450,12 @@ public class Drone implements Runnable {
      */
     public void sendStatus(String statusMsg) {
 
-        if (injectedFault == FaultType.PACKET_LOSS && !faultTriggered) {
-            faultTriggered = true;
-            System.out.println("[Drone " + droneId + "] Fault triggered: packet loss");
+        if (injectedFault == FaultType.PACKET_LOSS) {
+            if (!faultTriggered) {
+                faultTriggered = true;
+                sendGuiUpdate("DRONE_FAULTED", currentTask.getZoneID());
+                System.out.println("[Drone " + droneId + "] Fault triggered: packet loss");
+            }
             return;
         }
 
