@@ -31,7 +31,6 @@ public class Scheduler implements Runnable {
     private DatagramPacket receivePacket;
     private Random rand = new Random();
     private EventLogger logger;
-    private static final long PACKET_LOSS_TIMEOUT = 5000;
 
     /**
      * Constructor for the scheduler, default drones and incident
