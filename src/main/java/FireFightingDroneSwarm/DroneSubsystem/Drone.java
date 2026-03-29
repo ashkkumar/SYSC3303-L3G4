@@ -1,4 +1,5 @@
 package FireFightingDroneSwarm.DroneSubsystem;
+import FireFightingDroneSwarm.Events.EventLogger;
 import FireFightingDroneSwarm.FireIncidentSubsystem.FireEvent;
 import FireFightingDroneSwarm.FireIncidentSubsystem.Severity;
 import FireFightingDroneSwarm.Scheduler.Scheduler;
@@ -42,6 +43,7 @@ public class Drone implements Runnable {
     private double targetX;
     private double targetY;
     private ZoneMapController zoneMapController;
+    private EventLogger logger;
 
 
     /**
@@ -49,7 +51,7 @@ public class Drone implements Runnable {
      * @param scheduler         The Scheduler the drone communicates with
      * @param zoneMapController
      */
-    public Drone(int droneId, Scheduler scheduler, ZoneMapController zoneMapController) {
+    public Drone(int droneId, Scheduler scheduler, ZoneMapController zoneMapController, EventLogger logger) {
         this.droneId = droneId;
         this.scheduler = scheduler;
         this.status = DroneStatus.IDLE;
@@ -58,6 +60,7 @@ public class Drone implements Runnable {
         this.posY = BASE_Y;
         this.zone = 0;
         this.waterTank = MAX_TANK;
+        this.logger = logger;
 
         try {
             sendReceiveSocket = new DatagramSocket();
@@ -165,7 +168,7 @@ public class Drone implements Runnable {
         boolean success = extinguish(currentTask.getSeverity());
 
         if (!success) {
-            System.out.println("Drone Couldn't drop agent, Fault occured");
+            System.out.println("Drone Couldn't drop agent, Fault occurred");
             return;
         }
 
@@ -205,7 +208,6 @@ public class Drone implements Runnable {
         transition(DroneStatus.IDLE);
         System.out.println("[Drone " + droneId + "] returned to base");
 
-
         // zone = currentTask.getZoneID(); for when we implement refilling, if the tank isn't full it will stay and go to idle
     }
 
@@ -215,11 +217,13 @@ public class Drone implements Runnable {
      * @param newStatus The new state of the drone
      */
     synchronized void transition(DroneStatus newStatus) {
+        String oldStatus = status.toString();
         System.out.println("[Drone " + droneId + " " + status + "] Transitioning to " + newStatus);
+        logger.Log("Drone " + droneId, "STATE_CHANGE", oldStatus + " -> " + newStatus);
 
         if (newStatus == DroneStatus.OUT_OF_SERVICE || newStatus == DroneStatus.FAULTED) {
             status = newStatus;
-
+            logger.Log("Drone " + droneId, "CRITICAL_FAULT", "Status reached: " + newStatus);
             String statusMsg =
                     droneId + "," +
                             status + "," +
@@ -326,6 +330,7 @@ public class Drone implements Runnable {
                     && i >= steps / 2) {
                 faultTriggered = true;
                 System.out.println("[Drone " + droneId + "] Fault triggered: stuck mid flight");
+                logger.Log("Drone " + droneId, "FAULT_TRIGGERED", "STUCK_MID_FLIGHT", "Pos: " + posX + "," + posY);
 
                 transition(DroneStatus.FAULTED);
                 sendFaultStatus("STUCK_MID_FLIGHT");
@@ -595,9 +600,10 @@ public class Drone implements Runnable {
     }
 
     public static void main(String[] args) {
-        Thread newDrone = new Thread(new Drone(1));
-        Thread droneTwo = new Thread(new Drone(2));
-        Thread droneThree = new Thread(new Drone(3));
+        EventLogger sharedLogger = new EventLogger(1000);
+        Thread newDrone = new Thread(new Drone(1, null, null, sharedLogger));
+        Thread droneTwo = new Thread(new Drone(2, null, null, sharedLogger));
+        Thread droneThree = new Thread(new Drone(3, null, null, sharedLogger));
 
         newDrone.start();
         droneTwo.start();
