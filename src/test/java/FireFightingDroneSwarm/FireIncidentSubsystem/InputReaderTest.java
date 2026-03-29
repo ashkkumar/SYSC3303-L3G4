@@ -62,7 +62,7 @@ class InputReaderTest {
      */
     @Test
     void GetParseEventFile() {
-        InputReader r = new InputReader("sample_event_file.csv", "sample_zone_file.csv");
+        InputReader r = new InputReader("sample_event_multiple.csv", "sample_zone_multiple.csv");
 
         ArrayList<FireEvent> events = r.parseEventFile();
         assertNotNull(events);

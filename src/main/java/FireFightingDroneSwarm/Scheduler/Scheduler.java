@@ -29,6 +29,7 @@ public class Scheduler implements Runnable {
     private DatagramSocket socket;
     private DatagramPacket receivePacket;
     private Random rand = new Random();
+    private static final long PACKET_LOSS_TIMEOUT = 5000;
 
     /**
      * Constructor for the scheduler, default drones and incident
@@ -43,6 +44,7 @@ public class Scheduler implements Runnable {
             this.socket = new DatagramSocket(null);
             socket.setReuseAddress(true);
             socket.bind(new InetSocketAddress(50000));
+            socket.setSoTimeout(1000);
             System.out.println("Bound to socket 50000");
         } catch (SocketException e) {
             e.printStackTrace();
@@ -351,7 +353,11 @@ public class Scheduler implements Runnable {
                 handleDroneStatus(data, receivePacket.getLength(), address, port);
             }
 
-        } catch (Exception e) {
+        } catch (SocketTimeoutException e) {
+            // printing this out is mad annoying
+            // makes console look super ugly
+        }
+        catch (Exception e) {
             e.printStackTrace();
         }
     }
@@ -444,10 +450,15 @@ public class Scheduler implements Runnable {
 
         } else {
 
-            if(activeAssignments.get(droneId) != null) {
-                if(fireID == activeAssignments.get(droneId).getFireID()) {
-                    drone.update(status, posX, posY, water);
-                }
+            FireEvent assigned = activeAssignments.get(droneId);
+
+            if (assigned == null) {
+                drone.update(status, posX, posY, water);
+            } else if (fireID == assigned.getFireID()) {
+                drone.update(status, posX, posY, water);
+                assignmentStartTimes.put(droneId, System.currentTimeMillis());
+            } else {
+                return;
             }
 
         }
@@ -517,6 +528,65 @@ public class Scheduler implements Runnable {
     }
 
     /**
+     * Checks all active drone assignments for packet-loss faults that have exceeded
+     * the allowed timeout threshold. If the time is longer than
+     * PACKET_LOSS_TIMEOUT (5000 ms), the drone lost
+     * communication and the task is then recreated for a different drone
+     * so that it may accomplish the task without failure
+     */
+    private void checkPacketLossTimeouts() {
+        long now = System.currentTimeMillis();
+        List<Integer> timedOutDrones = new ArrayList<>();
+
+        for (Map.Entry<Integer, FireEvent> entry : activeAssignments.entrySet()) {
+            int droneId = entry.getKey();
+            FireEvent assignedEvent = entry.getValue();
+
+            if (assignedEvent.getFault() != FaultType.PACKET_LOSS) {
+                continue;
+            }
+
+            Long startTime = assignmentStartTimes.get(droneId);
+            if (startTime == null) {
+                continue;
+            }
+
+            if (now - startTime > PACKET_LOSS_TIMEOUT) {
+                timedOutDrones.add(droneId);
+            }
+        }
+
+        for (Integer droneId : timedOutDrones) {
+            FireEvent failedEvent = activeAssignments.remove(droneId);
+            assignmentStartTimes.remove(droneId);
+
+            if (failedEvent != null) {
+                System.out.println("[Scheduler] Packet loss timeout for Drone " + droneId +
+                        ", reassigning fire " + failedEvent.getFireID());
+
+                FireEvent retry = new FireEvent(
+                        failedEvent.getZoneID(),
+                        failedEvent.getTaskType(),
+                        LocalTime.now(),
+                        failedEvent.getSeverity(),
+                        FaultType.NONE,
+                        failedEvent.getFireID()
+                );
+
+                try {
+                    put(retry);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        if (!timedOutDrones.isEmpty()) {
+            assignDroneEvent();
+        }
+    }
+
+    /**
      * Scheduler's implementation of run, wait to receive a packet from the
      * subsystem or a drone, and then process the packet. Continuously
      * handle fire events in the buffer in the meantime.
@@ -527,6 +597,7 @@ public class Scheduler implements Runnable {
             synchronized (this) { // prevents a race on this method instance from within the object
                 while (!this.getAllTasksSent() && !this.getAllTasksProcessed()) {
                     this.receivePacket();
+                    this.checkPacketLossTimeouts();
                     this.assignDroneEvent();
                 }
                 System.out.println("[SCHEDULER] All tasks marked complete by incident subsystem");

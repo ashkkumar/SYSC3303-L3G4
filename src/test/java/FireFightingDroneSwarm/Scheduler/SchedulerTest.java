@@ -70,7 +70,7 @@ class SchedulerTest {
         scheduler.setZoneIDs(zones);
 
         // Put one event so get() can actually remove it (and then see buffer empty)
-        FireEvent e1 = new FireEvent(1, TaskType.FIRE_DETECTED, LocalTime.of(13, 0), Severity.LOW, FaultType.NONE);
+        FireEvent e1 = new FireEvent(1, TaskType.FIRE_DETECTED, LocalTime.of(13, 0), Severity.LOW, FaultType.NONE, 1);
         scheduler.put(e1);
 
         // Now declare no more tasks will arrive
@@ -78,12 +78,12 @@ class SchedulerTest {
 
         // First get returns the event
         FireEvent first = scheduler.get();
-        assertNull(first);
+        assertNotNull(first);
 
         // Now buffer is empty AND allTasksSent is true → scheduler marks processed
         FireEvent second = scheduler.get();
         assertNull(second);
-        assertFalse(scheduler.getAllTasksProcessed());
+        assertTrue(scheduler.getAllTasksProcessed());
     }
 
     /**
@@ -146,7 +146,8 @@ class SchedulerTest {
                 TaskType.FIRE_DETECTED,
                 LocalTime.now(),
                 Severity.HIGH,
-                FaultType.NONE
+                FaultType.NONE,
+                1
         );
         scheduler.put(event);
         scheduler.assignDroneEvent();
