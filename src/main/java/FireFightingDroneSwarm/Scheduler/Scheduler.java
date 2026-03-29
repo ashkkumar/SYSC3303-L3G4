@@ -3,6 +3,7 @@ package FireFightingDroneSwarm.Scheduler;
 import FireFightingDroneSwarm.DroneSubsystem.Drone;
 import FireFightingDroneSwarm.DroneSubsystem.DroneStatus;
 import FireFightingDroneSwarm.DroneSubsystem.FaultType;
+import FireFightingDroneSwarm.Events.EventLogger;
 import FireFightingDroneSwarm.FireIncidentSubsystem.*;
 
 import java.net.*;
@@ -29,15 +30,17 @@ public class Scheduler implements Runnable {
     private DatagramSocket socket;
     private DatagramPacket receivePacket;
     private Random rand = new Random();
+    private EventLogger logger;
 
     /**
      * Constructor for the scheduler, default drones and incident
      * reporter to null to prevent cyclic dependency
      * @param capacity int for capacity of the task queue.
      */
-    public Scheduler(int capacity) {
+    public Scheduler(int capacity, EventLogger logger) {
         this.capacity = capacity;
         this.incidentReporter = null;
+        this.logger = logger;
 
         try {
             this.socket = new DatagramSocket(null);
@@ -48,6 +51,7 @@ public class Scheduler implements Runnable {
             e.printStackTrace();
             System.out.println("Socket binding error for Scheduler");
         }
+        logger.Log("Scheduler", "INIT", "System online, bound to port 50000");
 
     }
 
@@ -93,6 +97,7 @@ public class Scheduler implements Runnable {
         }
         buffer.add(fireEvent);
         System.out.println("[SCHEDULER] Buffered fire event: " + fireEvent);
+        logger.Log("Scheduler", "EVENT_BUFFERED", "FireID: " + fireEvent.getFireID(), "Zone: " + fireEvent.getZoneID());
         notifyAll(); // wake scheduler consumer thread
     }
 
@@ -297,6 +302,7 @@ public class Scheduler implements Runnable {
                     new DatagramPacket(data, data.length, droneAddress, dronePort);
 
             socket.send(packet);
+            logger.Log("Scheduler", "ASSIGNMENT_SENT", "Drone: " + drone.getDroneId(), "Zone: " + event.getZoneID());
 
             System.out.println("[Scheduler] Sent task to Drone "
                     + drone.getDroneId());
@@ -424,6 +430,7 @@ public class Scheduler implements Runnable {
 
         if (parts[0].equals("FAULT")) {
             System.out.println("[Scheduler] Received explicit fault packet: " + message);
+            logger.Log("Scheduler", "FAULT_RECEIVED", "Msg: " + message);
             return;
         }
 
@@ -560,10 +567,11 @@ public class Scheduler implements Runnable {
     }
 
     public static void main(String[] args) {
+        EventLogger logger = new EventLogger(1000);
         InputReader inputReader =
                 new InputReader("sample_event_multiple.csv",
                         "sample_zone_multiple.csv");
-        Scheduler scheduler = new Scheduler(15);
+        Scheduler scheduler = new Scheduler(15, logger);
         scheduler.setZoneIDs(Scheduler.buildZoneMap(inputReader.parseZoneFile()));
         Thread schedulerThread = new Thread(scheduler);
         schedulerThread.start();

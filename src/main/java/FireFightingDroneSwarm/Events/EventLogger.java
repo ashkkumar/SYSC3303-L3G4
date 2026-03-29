@@ -64,7 +64,7 @@ public class EventLogger {
 
     private boolean flag = false;
 
-    private final String fileName = "toilet.txt";
+    private final String fileName = "swarm_system.log";
 
     public EventLogger(long periodMs) {
         ThreadFactory factory = new ThreadFactory() {

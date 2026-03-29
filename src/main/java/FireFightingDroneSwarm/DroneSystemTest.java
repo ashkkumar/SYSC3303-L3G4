@@ -28,9 +28,11 @@ public class DroneSystemTest {
     public static void multipleIncidents() throws InterruptedException {
         System.out.println("\n=== Starting Iteration 1 System Test: Multiple Incidents ===");
 
+        EventLogger logger = new EventLogger(5000);
+
         ZoneMapView GUI = new ZoneMapView();
         ZoneMapController controller = new ZoneMapController(GUI);
-        Scheduler scheduler = new Scheduler(15);
+        Scheduler scheduler = new Scheduler(15, logger);
 
         InputReader inputReader =
                 new InputReader("sample_event_multiple.csv",
@@ -38,11 +40,9 @@ public class DroneSystemTest {
 
         ArrayList<Zone> zones = inputReader.parseZoneFile();
         scheduler.setZoneIDs(buildZoneMap(zones));
+        IncidentReporter incidentReporter = new IncidentReporter(inputReader, scheduler, controller, logger);
 
-        EventLogger logger = new EventLogger(5000);
-        IncidentReporter incidentReporter = new IncidentReporter(inputReader, scheduler, controller);
-
-        Drone drone = new Drone(1, scheduler, controller);
+        Drone drone = new Drone(1, scheduler, controller, logger);
 
         scheduler.setIncidentReporter(incidentReporter);
 
