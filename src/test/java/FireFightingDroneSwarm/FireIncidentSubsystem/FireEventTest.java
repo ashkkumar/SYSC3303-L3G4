@@ -16,7 +16,7 @@ class FireEventTest {
     @Test
     void TestGetZoneID() {
         FireEvent e = new FireEvent(3, TaskType.FIRE_DETECTED,
-                LocalTime.of(14, 3, 15), Severity.HIGH, FaultType.NONE);
+                LocalTime.of(14, 3, 15), Severity.HIGH, FaultType.NONE, 4);
 
         assertEquals(3, e.getZoneID());
     }
@@ -28,7 +28,7 @@ class FireEventTest {
     @Test
     void TestGetTaskType() {
         FireEvent e = new FireEvent(3, TaskType.FIRE_DETECTED,
-                LocalTime.of(14, 3, 15), Severity.HIGH, FaultType.NONE);
+                LocalTime.of(14, 3, 15), Severity.HIGH, FaultType.NONE, 5);
 
         assertEquals(TaskType.FIRE_DETECTED, e.getTaskType());
     }
@@ -40,7 +40,7 @@ class FireEventTest {
     @Test
     void TestGetTimestamp() {
         LocalTime t = LocalTime.of(14, 3, 15);
-        FireEvent e = new FireEvent(3, TaskType.FIRE_DETECTED, t, Severity.HIGH, FaultType.NONE);
+        FireEvent e = new FireEvent(3, TaskType.FIRE_DETECTED, t, Severity.HIGH, FaultType.NONE, 6);
 
         assertEquals(t, e.getTimestamp());
     }
@@ -52,7 +52,7 @@ class FireEventTest {
     @Test
     void TestGetSeverity() {
         FireEvent e = new FireEvent(3, TaskType.FIRE_DETECTED,
-                LocalTime.of(14, 3, 15), Severity.HIGH, FaultType.NONE);
+                LocalTime.of(14, 3, 15), Severity.HIGH, FaultType.NONE, 7);
 
         assertEquals(Severity.HIGH, e.getSeverity());
     }
@@ -65,7 +65,7 @@ class FireEventTest {
     @Test
     void TestToString() {
         FireEvent e = new FireEvent(7, TaskType.DRONE_REQUESTED,
-                LocalTime.of(14, 10), Severity.MODERATE, FaultType.NONE);
+                LocalTime.of(14, 10), Severity.MODERATE, FaultType.NONE, 8);
 
         String s = e.toString();
 

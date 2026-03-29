@@ -29,7 +29,7 @@ class DroneTest {
         }
 
         public TestDrone(int id, Scheduler scheduler) {
-            super(id, scheduler, null);
+            super(id, scheduler, null, logger);
         }
 
         @Override

@@ -139,7 +139,8 @@ class IncidentReporterTest {
                 TaskType.FIRE_DETECTED,
                 LocalTime.of(13, 0),
                 Severity.LOW,
-                FaultType.NONE
+                FaultType.NONE,
+                3
         );
 
         Method sendEvent = IncidentReporter.class.getDeclaredMethod("sendEvent", FireEvent.class);

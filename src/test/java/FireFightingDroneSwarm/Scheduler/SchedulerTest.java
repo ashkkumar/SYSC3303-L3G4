@@ -1,6 +1,7 @@
 package FireFightingDroneSwarm.Scheduler;
 
 import FireFightingDroneSwarm.DroneSubsystem.FaultType;
+import FireFightingDroneSwarm.Events.EventLogger;
 import FireFightingDroneSwarm.FireIncidentSubsystem.FireEvent;
 import FireFightingDroneSwarm.FireIncidentSubsystem.Severity;
 import FireFightingDroneSwarm.FireIncidentSubsystem.TaskType;
@@ -20,6 +21,7 @@ import java.util.concurrent.TimeoutException;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SchedulerTest {
+    private EventLogger logger;
 
     /**
      * Tests the getZoneCenter() method
@@ -30,10 +32,10 @@ class SchedulerTest {
      */
     @Test
     void TestGetZoneCenter() {
-        Scheduler s = new Scheduler(10);
+        Scheduler s = new Scheduler(10, logger);
         assertThrows(IllegalStateException.class, () -> s.getZoneCenter(1));
 
-        Scheduler s1 = new Scheduler(10);
+        Scheduler s1 = new Scheduler(10, logger);
 
         Map<Integer, Zone> zoneMap = new HashMap<>();
         zoneMap.put(1, new Zone(1, new int[]{0, 0}, new int[]{700, 600}));
@@ -43,7 +45,7 @@ class SchedulerTest {
         assertEquals(350.0, center[0]);
         assertEquals(300.0, center[1]);
 
-        Scheduler s2 = new Scheduler(10);
+        Scheduler s2 = new Scheduler(10, logger);
 
         Map<Integer, Zone> zoneMap2 = new HashMap<>();
         zoneMap2.put(1, new Zone(1, new int[]{0, 0}, new int[]{700, 600}));
@@ -63,14 +65,14 @@ class SchedulerTest {
      */
     @Test
     void TestGet() throws Exception {
-        Scheduler scheduler = new Scheduler(5);
+        Scheduler scheduler = new Scheduler(5, logger);
 
         Map<Integer, Zone> zones = new HashMap<>();
         zones.put(1, new Zone(1, new int[]{0, 0}, new int[]{10, 10}));
         scheduler.setZoneIDs(zones);
 
         // Put one event so get() can actually remove it (and then see buffer empty)
-        FireEvent e1 = new FireEvent(1, TaskType.FIRE_DETECTED, LocalTime.of(13, 0), Severity.LOW, FaultType.NONE);
+        FireEvent e1 = new FireEvent(1, TaskType.FIRE_DETECTED, LocalTime.of(13, 0), Severity.LOW, FaultType.NONE, 1);
         scheduler.put(e1);
 
         // Now declare no more tasks will arrive
@@ -91,7 +93,7 @@ class SchedulerTest {
      */
     @Test
     void testSetAllTasksSentUpdate() {
-        Scheduler s = new Scheduler(5);
+        Scheduler s = new Scheduler(5, logger);
         s.setAllTasksSent(true);
         assertTrue(s.getAllTasksSent());
     }
@@ -103,7 +105,7 @@ class SchedulerTest {
      */
     @Test
     void testZoneDistanceCalc() {
-        Scheduler s = new Scheduler(10);
+        Scheduler s = new Scheduler(10, logger);
 
         Map<Integer, Zone> zones = new HashMap<>();
         zones.put(1, new Zone(1, new int[]{0,0}, new int[]{6,8})); // center (3,4)
@@ -119,7 +121,7 @@ class SchedulerTest {
      */
     @Test
     void testAssignDroneEvenSendsUDPPacket() throws Exception {
-        Scheduler scheduler = new Scheduler(10);
+        Scheduler scheduler = new Scheduler(10, logger);
 
         // Setup zones
         Map<Integer, Zone> zones = new HashMap<>();
@@ -146,7 +148,8 @@ class SchedulerTest {
                 TaskType.FIRE_DETECTED,
                 LocalTime.now(),
                 Severity.HIGH,
-                FaultType.NONE
+                FaultType.NONE,
+                2
         );
         scheduler.put(event);
         scheduler.assignDroneEvent();

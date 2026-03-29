@@ -5,11 +5,9 @@ import FireFightingDroneSwarm.Scheduler.Scheduler;
 import FireFightingDroneSwarm.UserInterface.ZoneMapController;
 import FireFightingDroneSwarm.UserInterface.ZoneMapView;
 
+import java.net.*;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
 
 /**
  * This class represents the Fire Incident reporting thread.
@@ -26,6 +24,8 @@ public class IncidentReporter implements Runnable {
     private final double TIME_SCALE = 0.05;
     private ZoneMapController zoneMapController = null;
 
+    private EventLogger logger;
+
     private DatagramSocket socket;
     private InetAddress schedulerIP;
     private int schedulerPort = 50000;
@@ -36,12 +36,24 @@ public class IncidentReporter implements Runnable {
      * @param inputReader InputReader with file fields instantiated
      * @param scheduler Scheduler object for event sharing
      */
-    public IncidentReporter(InputReader inputReader, Scheduler scheduler, ZoneMapController zoneMapController) {
+    public IncidentReporter(InputReader inputReader, Scheduler scheduler, ZoneMapController zoneMapController, EventLogger logger) {
         this.inputReader = inputReader;
         this.scheduler = scheduler;
         this.zoneMapController = zoneMapController;
+        this.logger = logger;
         nextEvent = 0;
-        this.initializeSystem();
+        try {
+            // 1. INITIALIZE the socket FIRST
+            this.socket = new DatagramSocket();
+            this.schedulerIP = InetAddress.getLocalHost();
+
+            // 2. NOW call the system initialization
+            this.initializeSystem();
+
+        } catch (SocketException | UnknownHostException e) {
+            if(logger != null) logger.Log("IncidentReporter", "ERROR", "Socket init failed");
+            e.printStackTrace();
+        }
     }
 
     /**
@@ -110,6 +122,7 @@ public class IncidentReporter implements Runnable {
             FireEvent event = events.get(nextEvent);
             try {
                 sendEvent(event);
+                logger.Log("Incident Subsystem", "FIRE_REPORTED", "Zone: " + event.getZoneID(), "Severity: " + event.getSeverity());
                 if (zoneMapController != null) {
                     zoneMapController.fireDetected(event.getZoneID());
                 }
@@ -120,6 +133,7 @@ public class IncidentReporter implements Runnable {
             nextEvent++;
         }
         allEventsSent();
+        logger.Log("Incident Subsystem", "FINISHED", "All events transmitted");
     }
 
     /**
@@ -288,7 +302,9 @@ public class IncidentReporter implements Runnable {
         InputReader inputReader =
                 new InputReader("sample_event_multiple.csv",
                         "sample_zone_multiple.csv");
-        Thread incidentReporter = new Thread(new IncidentReporter(inputReader));
+        Scheduler scheduler = new Scheduler(15, logger);
+        IncidentReporter reporterRunnable = new IncidentReporter(inputReader, scheduler, null, logger);
+        Thread incidentReporter = new Thread(reporterRunnable);
         incidentReporter.start();
     }
 
