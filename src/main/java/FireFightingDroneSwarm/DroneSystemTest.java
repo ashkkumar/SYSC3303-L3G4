@@ -3,6 +3,7 @@ package FireFightingDroneSwarm;
 
 import FireFightingDroneSwarm.DroneSubsystem.Drone;
 import FireFightingDroneSwarm.Events.EventLogger;
+import FireFightingDroneSwarm.Events.LogManager;
 import FireFightingDroneSwarm.FireIncidentSubsystem.FireEvent;
 import FireFightingDroneSwarm.FireIncidentSubsystem.IncidentReporter;
 import FireFightingDroneSwarm.FireIncidentSubsystem.InputReader;
@@ -39,10 +40,10 @@ public class DroneSystemTest {
         ArrayList<Zone> zones = inputReader.parseZoneFile();
         scheduler.setZoneIDs(buildZoneMap(zones));
 
-        EventLogger logger = new EventLogger(5000);
         IncidentReporter incidentReporter = new IncidentReporter(inputReader, scheduler, controller);
+        LogManager logger = new LogManager();
 
-        Drone drone = new Drone(1, scheduler, controller);
+        Drone drone = new Drone(1, scheduler, controller, logger);
 
         scheduler.setIncidentReporter(incidentReporter);
 

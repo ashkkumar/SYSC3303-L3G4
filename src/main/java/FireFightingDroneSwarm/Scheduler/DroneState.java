@@ -96,4 +96,5 @@ public class DroneState {
     public String toString() {
         return "DroneState [droneId=" + droneId + ", status=" + status + ", posX=" + posX + ", posY=" + posY + ", waterTank=" + waterTank + ", address=" + address + ", port=" + port + "]";
     }
+
 }

@@ -165,4 +165,122 @@ class SchedulerTest {
 
         testDroneSocket.close();
     }
+
+    /**
+     * Tests that the scheduler skips a drone that does not have enough
+     * remaining water to service a fire event.
+     * @throws Exception if an unexpected error occurs during the test
+     */
+    @Test
+    void testInsufficientWater() throws Exception {
+        Scheduler scheduler = new Scheduler(5);
+
+        Map<Integer, Zone> zones = new HashMap<>();
+        zones.put(1, new Zone(1, new int[]{0, 0}, new int[]{100, 100}));
+        scheduler.setZoneIDs(zones);
+
+        DroneState lowWaterDrone = new DroneState(
+                1,
+                DroneStatus.IDLE,
+                0,
+                0,
+                20, // not enough for HIGH severity
+                InetAddress.getLocalHost(),
+                6001
+        );
+
+        DroneState enoughWaterDrone = new DroneState(
+                2,
+                DroneStatus.IDLE,
+                0,
+                0,
+                100, // enough for HIGH severity
+                InetAddress.getLocalHost(),
+                6002
+        );
+
+        scheduler.addDroneState(1, lowWaterDrone);
+        scheduler.addDroneState(2, enoughWaterDrone);
+
+        FireEvent event = new FireEvent(
+                1,
+                TaskType.FIRE_DETECTED,
+                LocalTime.now(),
+                Severity.HIGH,
+                FaultType.NONE,
+                1
+        );
+
+        scheduler.put(event);
+        scheduler.assignDroneEvent();
+
+        assertNull(
+                scheduler.getActiveAssignmentForDrone(1),
+                "Drone 1 should not be assigned because it does not have enough water."
+        );
+
+        assertNotNull(
+                scheduler.getActiveAssignmentForDrone(2),
+                "Drone 2 should be assigned because it has enough water."
+        );
+
+        assertEquals(
+                1,
+                scheduler.getActiveAssignmentForDrone(2).getZoneID()
+        );
+    }
+
+    /**
+     * Tests that the scheduler does not assign a fire event
+     * when no available drone has enough remaining water.
+     * no active assignment is created for any drone
+     * @throws Exception if an unexpected error occurs during the test
+     */
+    @Test
+    void testNoDroneHasWater() throws Exception {
+        Scheduler scheduler = new Scheduler(5);
+
+        Map<Integer, Zone> zones = new HashMap<>();
+        zones.put(1, new Zone(1, new int[]{0, 0}, new int[]{100, 100}));
+        scheduler.setZoneIDs(zones);
+
+        DroneState droneOne = new DroneState(
+                1,
+                DroneStatus.IDLE,
+                0,
+                0,
+                20,
+                InetAddress.getLocalHost(),
+                6001
+        );
+
+        DroneState droneTwo = new DroneState(
+                2,
+                DroneStatus.IDLE,
+                0,
+                0,
+                30,
+                InetAddress.getLocalHost(),
+                6002
+        );
+
+        scheduler.addDroneState(1, droneOne);
+        scheduler.addDroneState(2, droneTwo);
+
+        FireEvent event = new FireEvent(
+                1,
+                TaskType.FIRE_DETECTED,
+                LocalTime.now(),
+                Severity.HIGH,
+                FaultType.NONE,
+                1
+        );
+
+        scheduler.put(event);
+        scheduler.assignDroneEvent();
+
+        assertNull(scheduler.getActiveAssignmentForDrone(1));
+        assertNull(scheduler.getActiveAssignmentForDrone(2));
+    }
+
 }

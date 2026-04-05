@@ -1,35 +1,22 @@
 package FireFightingDroneSwarm.Events;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.sql.SQLOutput;
+import java.io.*;
+import java.nio.file.*;
 import java.time.LocalDateTime;
-import java.time.Duration;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
-/**
- * The EventLogger class records system events and writes them to a log file.
- * It also provides methods to analyze the log data such as response time,
- * throughput, and utilization.
- */
 public class EventLogger {
     private class LogEvent {
-        final long time;
         final String entity;
         final String code;
         final String[] data;
 
-        LogEvent(long time, String entity, String code, String... data) {
-            this.time = time;
+        LogEvent(String entity, String code, String... data) {
             this.entity = entity;
             this.code = code;
             this.data = data;
@@ -37,83 +24,126 @@ public class EventLogger {
 
         String format() {
             String timestamp = LocalDateTime.now().format(FORMATTER);
-
-            String log = "Event log: [" +
-                    timestamp + ", " +
-                    entity + ", " +
-                    code + "]";
-
-            if (data != null) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("[").append(timestamp).append("] [").append(entity).append("] [").append(code).append("]");
+            if (data != null && data.length > 0) {
                 for (String d : data) {
-                    log += ", " + d;
+                    sb.append(" [").append(d).append("]");
                 }
             }
-
-            log += "]";
-            return log;
+            return sb.toString();
         }
     }
 
     private final ConcurrentLinkedQueue<LogEvent> queue = new ConcurrentLinkedQueue<>();
-
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
-
     private final ScheduledExecutorService scheduler;
+    private final String fileName = "drone_logs.txt";
 
-    private static final Pattern LOG_PATTERN = Pattern.compile("\\[(.*?),(.*?),(.*?)\\]");
-
-    private boolean flag = false;
-
-    private final String fileName = "toilet.txt";
+    private static final Pattern LOG_LINE_PATTERN = Pattern.compile("\\[(.*?)\\] \\[(.*?)\\] \\[(.*?)\\]");
 
     public EventLogger(long periodMs) {
-        ThreadFactory factory = new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable r) {
-                Thread t = new Thread(r, "log-flusher-daemon");
-                t.setDaemon((true));
-                return t;
-            }
-        };
+        scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "log-flusher-daemon");
+            t.setDaemon(true);
+            return t;
+        });
 
-        scheduler = Executors.newSingleThreadScheduledExecutor(factory);
-
-        scheduler.scheduleAtFixedRate(
-                this::flush,
-                periodMs,
-                periodMs,
-                TimeUnit.MILLISECONDS
-        );
+        scheduler.scheduleAtFixedRate(this::flush, periodMs, periodMs, TimeUnit.MILLISECONDS);
     }
 
     public void Log(String entity, String eventCode, String... data) {
-        queue.add(new LogEvent(
-                System.currentTimeMillis(),
-                entity,
-                eventCode,
-                data
-        ));
-
+        queue.add(new LogEvent(entity, eventCode, data));
     }
 
-    public void flush() {
-        LogEvent e;
-
-
-        while ((e = queue.poll()) != null) {
-            try (PrintWriter writer = new PrintWriter(new FileWriter(fileName, flag))) {
-                flag = true; //now the write will append to file everytime
-                writer.write(e.format() + "\n");
-
-            } catch (IOException exception) {
-                System.err.println("An error occurred: " + exception.getMessage());
+    public synchronized void flush() {
+        if (queue.isEmpty()) return;
+        try (PrintWriter writer = new PrintWriter(new FileWriter(fileName, true))) {
+            LogEvent e;
+            while ((e = queue.poll()) != null) {
+                writer.println(e.format());
             }
+        } catch (IOException exception) {
+            System.err.println("Logging error: " + exception.getMessage());
         }
     }
 
     public void shutdown() {
-        scheduler.shutdownNow();
-
+        scheduler.shutdown();
         flush();
+    }
+
+    public void performSystemAnalysis() {
+        flush();
+        try {
+            List<String> lines = Files.readAllLines(Paths.get(fileName));
+            Map<String, Long> fireStartTimes = new HashMap<>();
+            Map<String, Long> droneMoveStart = new HashMap<>();
+
+            long totalFlightTime = 0;
+            long totalResponseTime = 0;
+            int extinguishedCount = 0;
+            long firstTimestamp = -1;
+            long lastTimestamp = -1;
+
+            for (String line : lines) {
+                Matcher m = LOG_LINE_PATTERN.matcher(line);
+                if (!m.find()) continue;
+
+                long time = LocalDateTime.parse(m.group(1), FORMATTER)
+                        .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+
+                String entity = m.group(2).trim();
+                String code = m.group(3).trim();
+
+                if (firstTimestamp == -1) firstTimestamp = time;
+                lastTimestamp = time;
+
+
+                if (code.equals("FIRE_SENT")) {
+                    String id = parseDataField(line, "FireID");
+                    if (id != null) fireStartTimes.put(id, time);
+                }
+                else if (code.equals("FIRE_CONFIRMED") || code.equals("FIRE_EXTINGUISHED")) {
+                    String id = parseDataField(line, "FireID");
+                    Long start = fireStartTimes.remove(id);
+                    if (start != null) {
+                        totalResponseTime += (time - start);
+                        extinguishedCount++;
+                    }
+                }
+
+                if (code.equals("MOVEMENT_START")) {
+                    droneMoveStart.put(entity, time);
+                }
+                else if (code.equals("MOVEMENT_ARRIVED") || code.equals("RETURN_BASE_ARRIVED")) {
+                    Long start = droneMoveStart.remove(entity);
+                    if (start != null) {
+                        totalFlightTime += (time - start);
+                    }
+                }
+            }
+            displayReport(firstTimestamp, lastTimestamp, totalResponseTime, extinguishedCount, totalFlightTime);
+        } catch (IOException e) {
+            System.err.println("Analysis failed: " + e.getMessage());
+        }
+    }
+
+    private String parseDataField(String line, String key) {
+        Pattern p = Pattern.compile("\\[" + key + ":\\s*(.*?)\\]");
+        Matcher m = p.matcher(line);
+        return m.find() ? m.group(1).trim() : null;
+    }
+
+    private void displayReport(long start, long end, long resp, int count, long flight) {
+        double totalSec = (end - start) / 1000.0;
+        System.out.println("\n========== SIMULATION METRICS ==========");
+        System.out.println("Total Simulation Time: " + String.format("%.2f", totalSec) + "s");
+        System.out.println("Fires Extinguished: " + count);
+        if (count > 0) {
+            System.out.println("Avg Response Time: " + String.format("%.2f", (resp / (double)count) / 1000.0) + "s");
+        }
+        System.out.println("Cumulative Drone Flight Time: " + (flight / 1000.0) + "s");
+        System.out.println("========================================\n");
     }
 }

@@ -1,6 +1,7 @@
 package FireFightingDroneSwarm.FireIncidentSubsystem;
 
 import FireFightingDroneSwarm.Events.EventLogger;
+import FireFightingDroneSwarm.Events.LogManager;
 import FireFightingDroneSwarm.Scheduler.Scheduler;
 import FireFightingDroneSwarm.UserInterface.ZoneMapController;
 import FireFightingDroneSwarm.UserInterface.ZoneMapView;
@@ -92,7 +93,7 @@ public class IncidentReporter implements Runnable {
                 sendZoneToGUI(z);
             }
 
-            // logger.Log("Incident Reporter", "INIT", "Incident Reporter Initialization");
+            LogManager.Log("Incident Reporter", "INIT", "Incident Reporter Initialization");
 
         } catch (Exception e){
             e.printStackTrace();
@@ -128,7 +129,7 @@ public class IncidentReporter implements Runnable {
      * @param event the event confirmed/completed by a drone
      */
     public void getEventConfirmation(FireEvent event){
-        System.out.println("[Incident Subsystem] recieved event confirmation " + event.toString());
+        System.out.println("[Incident Subsystem] received event confirmation " + event.toString());
     }
 
 
@@ -220,6 +221,10 @@ public class IncidentReporter implements Runnable {
             socket.send(packet);
             socket.send(guiPacket);
 
+            LogManager.Log("INCIDENT_REPORTER", "FIRE_SENT",
+                    "FireID: " + event.getFireID(),
+                    "Zone: " + event.getZoneID(),
+                    "Severity: " + event.getSeverity());
             System.out.println("[Incident Subsystem] Sent event " + event.getZoneID() + " " + event.getSeverity());
         } catch (Exception e) {
             e.printStackTrace();
@@ -239,6 +244,7 @@ public class IncidentReporter implements Runnable {
 
             DatagramPacket packet = new DatagramPacket(data, data.length, schedulerIP, schedulerPort);
             socket.send(packet);
+            LogManager.Log("INCIDENT_REPORTER", "WORKLOAD_COMPLETE", "TotalEvents: " + events.size());
             System.out.println("[Incident Subsystem] Sent all events " + events.size());
         } catch (Exception e){
             e.printStackTrace();

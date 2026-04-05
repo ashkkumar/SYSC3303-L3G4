@@ -3,6 +3,8 @@ package FireFightingDroneSwarm.Scheduler;
 import FireFightingDroneSwarm.DroneSubsystem.Drone;
 import FireFightingDroneSwarm.DroneSubsystem.DroneStatus;
 import FireFightingDroneSwarm.DroneSubsystem.FaultType;
+import FireFightingDroneSwarm.Events.EventLogger;
+import FireFightingDroneSwarm.Events.LogManager;
 import FireFightingDroneSwarm.FireIncidentSubsystem.*;
 
 import java.net.*;
@@ -190,6 +192,8 @@ public class Scheduler implements Runnable {
             for (DroneState drone : droneStates.values()) {
                 if (drone.getStatus() != DroneStatus.IDLE) continue;
                 if (activeAssignments.get(drone.getDroneId()) != null) continue;
+                int requiredWater = Drone.calculateWaterUsage(event.getSeverity());
+                if (drone.getWaterTank() < requiredWater) continue;
 
 
                 // Calculate the drone's distance to the zone center
@@ -218,6 +222,11 @@ public class Scheduler implements Runnable {
         if (bestEvent != null) {
 
             buffer.remove(bestEvent);
+
+            LogManager.Log("SCHEDULER", "ASSIGN_TASK",
+                    "DroneID: " + bestDrone.getDroneId(),
+                    "FireID: " + bestEvent.getFireID(),
+                    "Score: " + String.format("%.2f", bestScore));
 
             System.out.println("[Scheduler] Assigning Drone "
                     + bestDrone.getDroneId()
@@ -398,6 +407,7 @@ public class Scheduler implements Runnable {
         FaultType faultType = FaultType.values()[faultNum];
 
         FireEvent event = new FireEvent(zoneID, taskType, LocalTime.now(), severity, faultType, eventId);
+        LogManager.Log("SCHEDULER", "FIRE_RECEIVED", "FireID: " + event.getFireID(), "Zone: " + event.getZoneID());
 
         try {
             put(event);
@@ -433,6 +443,7 @@ public class Scheduler implements Runnable {
             return;
         }
 
+
         int droneId = Integer.parseInt(parts[0]);
         DroneStatus status = DroneStatus.valueOf(parts[1]);
         double posX = Double.parseDouble(parts[2]);
@@ -446,6 +457,7 @@ public class Scheduler implements Runnable {
             drone = new DroneState(droneId, status, posX, posY, water, address, port);
             droneStates.put(droneId, drone);
 
+            LogManager.Log("SCHEDULER", "DRONE_REGISTERED", "ID: " + droneId, "Addr: " + address);
             System.out.println("[Scheduler] Registered Drone " + droneId);
 
         } else {
@@ -563,6 +575,10 @@ public class Scheduler implements Runnable {
             if (failedEvent != null) {
                 System.out.println("[Scheduler] Packet loss timeout for Drone " + droneId +
                         ", reassigning fire " + failedEvent.getFireID());
+                LogManager.Log("SCHEDULER", "TIMEOUT",
+                        "DroneID: " + droneId,
+                        "FireID: " + failedEvent.getFireID(),
+                        "Action: Returning to Buffer");
 
                 FireEvent retry = new FireEvent(
                         failedEvent.getZoneID(),
@@ -591,20 +607,28 @@ public class Scheduler implements Runnable {
      * subsystem or a drone, and then process the packet. Continuously
      * handle fire events in the buffer in the meantime.
      */
+
     @Override
     public void run() {
         try {
-            synchronized (this) { // prevents a race on this method instance from within the object
-                while (!this.getAllTasksSent() && !this.getAllTasksProcessed()) {
-                    this.receivePacket();
-                    this.checkPacketLossTimeouts();
-                    this.assignDroneEvent();
-                }
-                System.out.println("[SCHEDULER] All tasks marked complete by incident subsystem");
+            System.out.println("[SCHEDULER] Thread started. Waiting for events...");
+            while (!this.getAllTasksSent() || !this.getAllTasksProcessed()) {
+                this.receivePacket();
+                this.checkPacketLossTimeouts();
+                this.assignDroneEvent();
             }
+
+            System.out.println("[SCHEDULER] All tasks complete. Generating Metrics...");
+            LogManager.Log("SCHEDULER", "ALL_TASKS_COMPLETE", "Finalizing log buffer...");
+
+            LogManager.stopAndAnalyze();
+
         } catch (Exception e) {
             e.printStackTrace();
-            socket.close();
+        } finally {
+            if (socket != null && !socket.isClosed()) {
+                socket.close();
+            }
         }
     }
 
@@ -630,6 +654,10 @@ public class Scheduler implements Runnable {
         return map;
     }
 
+    public FireEvent getActiveAssignmentForDrone(int droneId) {
+        return activeAssignments.get(droneId);
+    }
+
     public static void main(String[] args) {
         InputReader inputReader =
                 new InputReader("sample_event_multiple.csv",
@@ -637,6 +665,15 @@ public class Scheduler implements Runnable {
         Scheduler scheduler = new Scheduler(15);
         scheduler.setZoneIDs(Scheduler.buildZoneMap(inputReader.parseZoneFile()));
         Thread schedulerThread = new Thread(scheduler);
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try {
+                System.out.println("\n[SYSTEM] Shutdown detected. Finalizing metrics...");
+                LogManager.stopAndAnalyze();
+                Thread.sleep(500);
+            } catch (Exception e) {
+                System.err.println("Error during shutdown: " + e.getMessage());
+            }
+        }));
         schedulerThread.start();
     }
 }
