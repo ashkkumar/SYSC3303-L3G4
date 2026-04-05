@@ -1,9 +1,12 @@
 package FireFightingDroneSwarm.DroneSubsystem;
+import FireFightingDroneSwarm.Events.EventLogger;
+import FireFightingDroneSwarm.Events.LogManager;
 import FireFightingDroneSwarm.FireIncidentSubsystem.FireEvent;
 import FireFightingDroneSwarm.FireIncidentSubsystem.Severity;
 import FireFightingDroneSwarm.Scheduler.Scheduler;
 import FireFightingDroneSwarm.UserInterface.ZoneMapController;
 import FireFightingDroneSwarm.FireIncidentSubsystem.TaskType;
+import jdk.jfr.Event;
 
 import java.io.IOException;
 import java.net.*;
@@ -23,6 +26,7 @@ public class Drone implements Runnable {
     private FaultType injectedFault = FaultType.NONE;
     private boolean faultTriggered = false;
     private int faultSleepTime = 2000;
+    private LogManager logger;
 
     //UDP
     DatagramPacket sendPacket, receivePacket;
@@ -49,7 +53,7 @@ public class Drone implements Runnable {
      * @param scheduler         The Scheduler the drone communicates with
      * @param zoneMapController
      */
-    public Drone(int droneId, Scheduler scheduler, ZoneMapController zoneMapController) {
+    public Drone(int droneId, Scheduler scheduler, ZoneMapController zoneMapController, LogManager logger) {
         this.droneId = droneId;
         this.scheduler = scheduler;
         this.status = DroneStatus.IDLE;
@@ -58,6 +62,7 @@ public class Drone implements Runnable {
         this.posY = BASE_Y;
         this.zone = 0;
         this.waterTank = MAX_TANK;
+        this.logger = logger;
 
         try {
             sendReceiveSocket = new DatagramSocket();
@@ -89,7 +94,7 @@ public class Drone implements Runnable {
      */
     @Override
     public void run() {
-
+        LogManager.Log("DRONE_" + droneId, "SYSTEM_STARTUP", "Status: " + status);
         while (status != DroneStatus.OUT_OF_SERVICE) {
             try {
                 String statusMsg =
@@ -121,6 +126,7 @@ public class Drone implements Runnable {
      * subject to change
      */
     void executeTask() {
+        LogManager.Log("DRONE_" + droneId, "TASK_START", "FireID: " + currentTask.getFireID(), "Zone: " + currentTask.getZoneID());
         System.out.println("[Drone " + droneId + "] Dispatched to zone "
                 + currentTask.getZoneID());
 
@@ -204,6 +210,8 @@ public class Drone implements Runnable {
 
         transition(DroneStatus.IDLE);
         System.out.println("[Drone " + droneId + "] returned to base");
+        String completionMsg = droneId + ",IDLE," + posX + "," + posY + "," + waterTank + "," + currentTask.getFireID() + ",COMPLETE";
+        sendStatus(completionMsg);
 
 
         // zone = currentTask.getZoneID(); for when we implement refilling, if the tank isn't full it will stay and go to idle
@@ -215,11 +223,12 @@ public class Drone implements Runnable {
      * @param newStatus The new state of the drone
      */
     synchronized void transition(DroneStatus newStatus) {
+        DroneStatus oldStatus = this.status;
         System.out.println("[Drone " + droneId + " " + status + "] Transitioning to " + newStatus);
 
         if (newStatus == DroneStatus.OUT_OF_SERVICE || newStatus == DroneStatus.FAULTED) {
+            LogManager.Log("DRONE_" + droneId, "FAULT", "FaultType: " + injectedFault);
             status = newStatus;
-
             String statusMsg =
                     droneId + "," +
                             status + "," +
@@ -261,6 +270,13 @@ public class Drone implements Runnable {
         }
 
         status = newStatus;
+
+        LogManager.Log("DRONE_" + droneId, "STATE_TRANSITION",
+                "From: " + oldStatus,
+                "To: " + newStatus,
+                "Pos: (" + posX + "," + posY + ")",
+                "Water: " + waterTank);
+
         String statusMsg =
                 droneId + "," +
                         status + "," +
@@ -279,6 +295,7 @@ public class Drone implements Runnable {
     private boolean extinguish(Severity severity) {
 
         if (injectedFault == FaultType.NOZZLE_JAM && !faultTriggered) {
+            LogManager.Log("DRONE_" + droneId, "FAULT", "Type: NOZZLE_JAM");
             faultTriggered = true;
 
             System.out.println("[Drone " + droneId + "] Fault triggered Nozzle Jam.");
@@ -297,8 +314,9 @@ public class Drone implements Runnable {
             case HIGH -> extinguishTime = 3500;
             default -> extinguishTime = 1500;
         }
-
+        LogManager.Log("DRONE_" + droneId, "EXTINGUISHING_START", "Severity: " + severity);
         sleep(extinguishTime);
+        LogManager.Log("DRONE_" + droneId, "EXTINGUISHING_END", "WaterUsed: " + calculateWaterUsage(severity));
         return true;
     }
 
@@ -308,6 +326,7 @@ public class Drone implements Runnable {
      * easier to log now
      */
     private boolean travelTo(double x, double y) {
+        LogManager.Log("DRONE_" + droneId, "EN_ROUTE", "Target: (" + x + "," + y + ")");
         double distance = calculateDistanceToZone(x, y);
 
         double dx = x - posX;
@@ -326,12 +345,11 @@ public class Drone implements Runnable {
                     && i >= steps / 2) {
                 faultTriggered = true;
                 System.out.println("[Drone " + droneId + "] Fault triggered: stuck mid flight");
-
                 transition(DroneStatus.FAULTED);
                 sendFaultStatus("STUCK_MID_FLIGHT");
 
                 sleep(faultSleepTime);
-
+                LogManager.Log("DRONE_" + droneId, "STUCK_MID_FLIGHT", "Step: " + i);
                 return false;
             }
             posX += stepX;
@@ -343,6 +361,7 @@ public class Drone implements Runnable {
 
         posX = x;
         posY = y;
+        LogManager.Log("DRONE_" + droneId, "MOVEMENT_ARRIVED", "Pos: (" + posX + "," + posY + ")");
         return true;
 
     }
@@ -448,18 +467,20 @@ public class Drone implements Runnable {
         if (injectedFault == FaultType.PACKET_LOSS) {
             if (!faultTriggered) {
                 faultTriggered = true;
+                LogManager.Log("DRONE_" + droneId, "FAULT", "Type: PACKET_LOSS", "FireID: " + currentTask.getFireID());
                 sendGuiUpdate("DRONE_FAULTED", currentTask.getZoneID());
                 System.out.println("[Drone " + droneId + "] Fault triggered: packet loss");
             }
             return;
         }
-
+        LogManager.Log("DRONE_" + droneId, "SEND_STATUS", statusMsg);
         System.out.println("Sending drone status: " + statusMsg);
         byte msg[] = statusMsg.getBytes();
 
         try {
             sendPacket = new DatagramPacket(msg, msg.length, InetAddress.getLocalHost(), 50000);
         } catch (UnknownHostException e) {
+            LogManager.Log("DRONE_" + droneId, "NETWORK_ERROR", "Unknown Host");
             e.printStackTrace();
             System.exit(1);
         }
@@ -467,6 +488,7 @@ public class Drone implements Runnable {
         try {
             sendReceiveSocket.send(sendPacket);
         } catch (IOException e) {
+            LogManager.Log("DRONE_" + droneId, "NETWORK_ERROR", "IO Exception during send");
             e.printStackTrace();
             System.exit(1);
         }
@@ -529,6 +551,10 @@ public class Drone implements Runnable {
             FaultType faultType = FaultType.values()[faultNum];
 
             System.out.println("[Drone " + droneId + "] Received fire assignment for zone " + zoneID);
+            LogManager.Log("DRONE_" + droneId, "ASSIGNMENT_RECEIVED",
+                    "FireID: " + fireID,
+                    "Zone: " + zoneID,
+                    "Severity: " + severity);
 
             currentTask = new FireEvent(zoneID, taskType, java.time.LocalTime.now(), severity, faultType, fireID);
 
@@ -536,6 +562,7 @@ public class Drone implements Runnable {
             executeTask();
 
         } catch (Exception e) {
+            LogManager.Log("DRONE_" + droneId, "UDP_ERROR", e.getMessage());
             e.printStackTrace();
         }
     }
