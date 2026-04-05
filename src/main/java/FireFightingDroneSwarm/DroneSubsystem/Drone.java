@@ -27,6 +27,7 @@ public class Drone implements Runnable {
     private boolean faultTriggered = false;
     private int faultSleepTime = 2000;
     private LogManager logger;
+    private double batteryLife = full;
 
     //UDP
     DatagramPacket sendPacket, receivePacket;
@@ -47,6 +48,9 @@ public class Drone implements Runnable {
     private double targetY;
     private ZoneMapController zoneMapController;
 
+    // full battery
+    private static final double full = 100.0;
+
 
     /**
      * @param droneId           ID to represent a drone object
@@ -63,6 +67,7 @@ public class Drone implements Runnable {
         this.zone = 0;
         this.waterTank = MAX_TANK;
         this.logger = logger;
+        // this.batteryLife = full;
 
         try {
             sendReceiveSocket = new DatagramSocket();
@@ -94,7 +99,7 @@ public class Drone implements Runnable {
      */
     @Override
     public void run() {
-        LogManager.Log("DRONE_" + droneId, "SYSTEM_STARTUP", "Status: " + status);
+        LogManager.Log("DRONE_" + droneId, "SYSTEM_STARTUP", "Status: " + status, "Battery Life: " + (int) batteryLife);
         while (status != DroneStatus.OUT_OF_SERVICE) {
             try {
                 String statusMsg =
@@ -113,6 +118,7 @@ public class Drone implements Runnable {
                 sendGuiUpdate("DRONE_UPDATE", (currentTask != null) ? currentTask.getZoneID() : 0);
                 sendStatus(statusMsg);
                 receiveFireEvent();
+                batteryLife -= 0.01;
 
                 Thread.sleep(5000);
 
@@ -290,7 +296,8 @@ public class Drone implements Runnable {
                 "From: " + oldStatus,
                 "To: " + newStatus,
                 "Pos: (" + posX + "," + posY + ")",
-                "Water: " + waterTank);
+                "Water: " + waterTank,
+                "Battery Life: " + (int) batteryLife);
 
         String statusMsg =
                 droneId + "," +
@@ -344,7 +351,7 @@ public class Drone implements Runnable {
      * easier to log now
      */
     private boolean travelTo(double x, double y) {
-        LogManager.Log("DRONE_" + droneId, "EN_ROUTE", "Target: (" + x + "," + y + ")");
+        LogManager.Log("DRONE_" + droneId, "EN_ROUTE", "Target: (" + x + "," + y + ")", "BatteryLife: " + (int) batteryLife);
         double distance = calculateDistanceToZone(x, y);
 
         double dx = x - posX;
@@ -372,6 +379,7 @@ public class Drone implements Runnable {
             }
             posX += stepX;
             posY += stepY;
+            decBatteryLife();
 
             sendGuiUpdate("DRONE_UPDATE", currentTask.getZoneID());
             sendStatus(droneId + "," + status + "," + posX + "," + posY + "," + waterTank + "," + currentTask.getFireID());
@@ -493,7 +501,7 @@ public class Drone implements Runnable {
             }
             return;
         }
-        LogManager.Log("DRONE_" + droneId, "SEND_STATUS", statusMsg);
+        LogManager.Log("DRONE_" + droneId, "SEND_STATUS", statusMsg, "Battery Life: " + (int) batteryLife);
         System.out.println("Sending drone status: " + statusMsg);
         byte msg[] = statusMsg.getBytes();
 
@@ -651,6 +659,10 @@ public class Drone implements Runnable {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    public void decBatteryLife() {
+        batteryLife -= 1;
     }
 
     /**
