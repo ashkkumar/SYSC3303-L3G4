@@ -621,8 +621,7 @@ public class Scheduler implements Runnable {
             System.out.println("[SCHEDULER] All tasks complete. Generating Metrics...");
             LogManager.Log("SCHEDULER", "ALL_TASKS_COMPLETE", "Finalizing log buffer...");
 
-            LogManager.stop();
-            LogManager.performAnalysis();
+            LogManager.stopAndAnalyze();
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -665,8 +664,7 @@ public class Scheduler implements Runnable {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try {
                 System.out.println("\n[SYSTEM] Shutdown detected. Finalizing metrics...");
-                LogManager.stop();
-                LogManager.performAnalysis();
+                LogManager.stopAndAnalyze();
                 Thread.sleep(500);
             } catch (Exception e) {
                 System.err.println("Error during shutdown: " + e.getMessage());

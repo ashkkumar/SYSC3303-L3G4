@@ -25,7 +25,6 @@ public class EventLogger {
         String format() {
             String timestamp = LocalDateTime.now().format(FORMATTER);
             StringBuilder sb = new StringBuilder();
-            // Simplified format to make regex parsing reliable
             sb.append("[").append(timestamp).append("] [").append(entity).append("] [").append(code).append("]");
             if (data != null && data.length > 0) {
                 for (String d : data) {
@@ -41,7 +40,6 @@ public class EventLogger {
     private final ScheduledExecutorService scheduler;
     private final String fileName = "drone_logs.txt";
 
-    // Updated Regex to match the [Timestamp] [Entity] [Code] format
     private static final Pattern LOG_LINE_PATTERN = Pattern.compile("\\[(.*?)\\] \\[(.*?)\\] \\[(.*?)\\]");
 
     public EventLogger(long periodMs) {
@@ -76,7 +74,7 @@ public class EventLogger {
     }
 
     public void performSystemAnalysis() {
-        flush(); // Ensure everything is written before analysis
+        flush();
         try {
             List<String> lines = Files.readAllLines(Paths.get(fileName));
             Map<String, Long> fireStartTimes = new HashMap<>();
@@ -101,9 +99,7 @@ public class EventLogger {
                 if (firstTimestamp == -1) firstTimestamp = time;
                 lastTimestamp = time;
 
-                // --- Calculation Logic ---
 
-                // 1. Fire Response (Uses FireID)
                 if (code.equals("FIRE_SENT")) {
                     String id = parseDataField(line, "FireID");
                     if (id != null) fireStartTimes.put(id, time);
@@ -117,7 +113,6 @@ public class EventLogger {
                     }
                 }
 
-                // 2. Flight Time (Per Drone)
                 if (code.equals("MOVEMENT_START")) {
                     droneMoveStart.put(entity, time);
                 }
@@ -135,7 +130,6 @@ public class EventLogger {
     }
 
     private String parseDataField(String line, String key) {
-        // Looks for [Key: Value] inside the log line
         Pattern p = Pattern.compile("\\[" + key + ":\\s*(.*?)\\]");
         Matcher m = p.matcher(line);
         return m.find() ? m.group(1).trim() : null;
