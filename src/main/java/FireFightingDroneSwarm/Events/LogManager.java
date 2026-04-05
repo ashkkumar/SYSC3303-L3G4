@@ -12,11 +12,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * LogManager provides a global, thread-safe access point for the system's EventLogger.
- * It coordinates the stopping of the shared logger, ensures the log file is generated,
- * and performs statistical analysis on the resulting drone_logs.txt file.
+ * LogManager provides a global access point for the system's EventLogger and
+ * calculates required performance metrics after simulation completion.
  * * @author Abhiram Sureshkumar
- * @version 1.2
+ * @version 1.5
  */
 public class LogManager {
 
@@ -25,10 +24,6 @@ public class LogManager {
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
 
     static {
-        /**
-         * Ensures that each new simulation run starts with a fresh log file.
-         * This prevents old logs from interfering with the current run's metrics.
-         */
         File file = new File(LOG_FILE);
         if (file.exists()) {
             file.delete();
@@ -36,49 +31,63 @@ public class LogManager {
     }
 
     /**
-     * Private constructor to prevent instantiation of this utility class.
+     * Private constructor to prevent instantiation.
      */
     public LogManager() {}
 
     /**
-     * Records a system event to the shared log file.
-     * * @param entity    The name of the component reporting the event.
-     * @param eventCode A short string identifying the type of event.
-     * @param data      Optional additional strings containing metadata.
+     * Records a system event.
+     * * @param entity    Reporting component identifier.
+     * @param eventCode Unique identifier for the event type.
+     * @param data      Metadata associated with the event.
      */
     public static void Log(String entity, String eventCode, String... data) {
         SHARED_LOGGER.Log(entity, eventCode, data);
     }
 
     /**
-     * Shuts down the EventLogger to flush all pending logs to the text file,
-     * then parses the file to generate performance metrics.
+     * Shuts down the logger and triggers the analysis of the resulting log file.
      */
     public static void stopAndAnalyze() {
-        System.out.println("Finalizing logs and flushing to " + LOG_FILE + "...");
-
         SHARED_LOGGER.shutdown();
-
         try {
-            // Wait for file system synchronization
-            Thread.sleep(600);
+            Thread.sleep(800);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-
         performAnalysis();
     }
 
     /**
-     * Reads the generated log file and calculates swarm performance statistics.
+     * Updates drone active time tracking based on state transitions.
+     * * @param line      The log line being processed.
+     * @param droneId   The ID of the drone.
+     * @param timestamp The time the event occurred.
+     * @param startMap  Map tracking when a drone started its current task.
+     * @param activeMap Map accumulating total active time per drone.
+     */
+    private static void handleDroneUtilization(String line, String droneId, LocalTime timestamp,
+                                               Map<String, LocalTime> startMap, Map<String, Double> activeMap) {
+        if (line.contains("TASK_START") || line.contains("EN_ROUTE") || line.contains("MOVEMENT_START")) {
+            startMap.putIfAbsent(droneId, timestamp);
+        } else if (line.contains("BASE_REACHED") || line.contains("IDLE")) {
+            if (startMap.containsKey(droneId)) {
+                double active = Duration.between(startMap.remove(droneId), timestamp).toMillis() / 1000.0;
+                activeMap.put(droneId, activeMap.getOrDefault(droneId, 0.0) + active);
+            }
+        }
+    }
+
+    /**
+     * Parses the log file to calculate response times, completion times, and drone utilization.
      */
     private static void performAnalysis() {
-        Map<String, LocalTime> flightStarts = new HashMap<>();
-        Map<String, Double> totalFlightTimes = new HashMap<>();
-        Map<String, LocalTime> idleStarts = new HashMap<>();
-        List<Double> allIdleDurations = new ArrayList<>();
-        Map<String, LocalTime> incidentDiscovery = new HashMap<>();
-        List<Double> responseLatencies = new ArrayList<>();
+        Map<String, LocalTime> eventCreation = new HashMap<>();
+        List<Double> responseTimes = new ArrayList<>();
+        List<Double> completionTimes = new ArrayList<>();
+
+        Map<String, LocalTime> droneWorkStart = new HashMap<>();
+        Map<String, Double> droneActiveTime = new HashMap<>();
 
         LocalTime firstEntry = null;
         LocalTime lastEntry = null;
@@ -93,36 +102,32 @@ public class LogManager {
                 lastEntry = timestamp;
 
                 String droneId = extractDroneId(line);
+                String fireId = extractValue(line, "FireID");
 
-                if (line.contains("FIRE_SENT") || line.contains("ASSIGNMENT_RECEIVED")) {
-                    String fId = extractValue(line, "FireID");
-                    if (fId != null) incidentDiscovery.putIfAbsent(fId, timestamp);
+                if ((line.contains("FIRE_SENT") || line.contains("ASSIGN_TASK")) && fireId != null) {
+                    eventCreation.putIfAbsent(fireId, timestamp);
                 }
 
-                if (line.contains("EXTINGUISHING_END")) {
-                    String fId = extractValue(line, "FireID");
-                    if (fId != null && incidentDiscovery.containsKey(fId)) {
-                        double latency = Duration.between(incidentDiscovery.remove(fId), timestamp).toMillis() / 1000.0;
-                        responseLatencies.add(latency);
+                if (line.contains("MOVEMENT_ARRIVED") && fireId != null) {
+                    if (eventCreation.containsKey(fireId)) {
+                        double resp = Duration.between(eventCreation.get(fireId), timestamp).toMillis() / 1000.0;
+                        responseTimes.add(resp);
+                    }
+                }
+
+                if (line.contains("EXTINGUISHING_END") && fireId != null) {
+                    if (eventCreation.containsKey(fireId)) {
+                        double comp = Duration.between(eventCreation.remove(fireId), timestamp).toMillis() / 1000.0;
+                        completionTimes.add(comp);
                     }
                 }
 
                 if (droneId != null) {
-                    if (line.contains("TASK_START") || line.contains("EN_ROUTE")) {
-                        flightStarts.put(droneId, timestamp);
-                        if (idleStarts.containsKey(droneId)) {
-                            allIdleDurations.add(Duration.between(idleStarts.remove(droneId), timestamp).toMillis() / 1000.0);
-                        }
-                    } else if (line.contains("MOVEMENT_ARRIVED") || line.contains("BASE_REACHED")) {
-                        if (flightStarts.containsKey(droneId)) {
-                            double flight = Duration.between(flightStarts.remove(droneId), timestamp).toMillis() / 1000.0;
-                            totalFlightTimes.put(droneId, totalFlightTimes.getOrDefault(droneId, 0.0) + flight);
-                        }
-                        idleStarts.put(droneId, timestamp);
-                    }
+                    handleDroneUtilization(line, droneId, timestamp, droneWorkStart, droneActiveTime);
                 }
             }
-            printReport(allIdleDurations, totalFlightTimes, responseLatencies, firstEntry, lastEntry);
+
+            displayMetricReport(responseTimes, completionTimes, droneActiveTime, firstEntry, lastEntry);
         } catch (IOException e) {
             System.err.println("Metric Analysis Error: " + e.getMessage());
         }
@@ -131,7 +136,7 @@ public class LogManager {
     /**
      * Extracts the timestamp from a log line.
      * * @param line The log line to parse.
-     * @return The LocalTime extracted, or null if not found.
+     * @return LocalTime object or null if not found.
      */
     private static LocalTime parseTimestamp(String line) {
         Pattern p = Pattern.compile("(\\d{2}:\\d{2}:\\d{2}\\.\\d{3})");
@@ -140,10 +145,10 @@ public class LogManager {
     }
 
     /**
-     * Extracts a numeric value associated with a key.
+     * Extracts a specific numeric value following a key from a log line.
      * * @param line The log line to parse.
-     * @param key  The key to search for.
-     * @return The numeric value as a string, or null if not found.
+     * @param key  The key identifier (e.g., "FireID").
+     * @return The extracted ID as a String, or null if not found.
      */
     private static String extractValue(String line, String key) {
         Pattern p = Pattern.compile(key + "[:\\s]+(\\d+)");
@@ -152,9 +157,9 @@ public class LogManager {
     }
 
     /**
-     * Identifies the drone associated with a log line.
+     * Extracts the Drone ID from a log line.
      * * @param line The log line to parse.
-     * @return The drone identifier string, or null if not found.
+     * @return The formatted drone ID or null if not found.
      */
     private static String extractDroneId(String line) {
         Pattern p = Pattern.compile("DRONE_(\\d+)");
@@ -163,20 +168,31 @@ public class LogManager {
     }
 
     /**
-     * Formats and prints the performance metrics report.
-     * * @param idles     List of all recorded drone idle durations.
-     * @param flights   Map of total flight times per drone.
-     * @param responses List of response latencies.
-     * @param start     The timestamp of the first event.
-     * @param end       The timestamp of the last event.
+     * Displays results for Average/Max Response Time, Average/Max Completion Time, and Drone Utilization.
+     * * @param responses   List of calculated response times.
+     * @param completions List of calculated completion times.
+     * @param activeTimes Map of accumulated active durations per drone.
+     * @param start       Timestamp of the first log entry.
+     * @param end         Timestamp of the last log entry.
      */
-    private static void printReport(List<Double> idles, Map<String, Double> flights, List<Double> responses, LocalTime start, LocalTime end) {
-        System.out.println("\n========== SIMULATION PERFORMANCE REPORT ==========");
-        System.out.printf("Average Drone Idle Time: %.2f sec\n", idles.stream().mapToDouble(d -> d).average().orElse(0.0));
-        flights.forEach((id, time) -> System.out.printf(" - %s Total Flight Time: %.2f sec\n", id, time));
-        if (start != null && end != null) {
-            System.out.printf("Total Mission Duration: %.2f sec\n", Duration.between(start, end).toMillis() / 1000.0);
-        }
-        System.out.println("===================================================\n");
+    private static void displayMetricReport(List<Double> responses, List<Double> completions, Map<String, Double> activeTimes, LocalTime start, LocalTime end) {
+        double totalDuration = (start != null && end != null) ? Duration.between(start, end).toMillis() / 1000.0 : 0;
+
+        System.out.println("\n========== PERFORMANCE METRICS ==========");
+
+        System.out.printf("Average Event Response Time: %.2f sec\n", responses.stream().mapToDouble(d -> d).average().orElse(0.0));
+        System.out.printf("Maximum Event Response Time: %.2f sec\n", responses.stream().mapToDouble(d -> d).max().orElse(0.0));
+
+        System.out.printf("Average Event Completion Time: %.2f sec\n", completions.stream().mapToDouble(d -> d).average().orElse(0.0));
+        System.out.printf("Maximum Event Completion Time: %.2f sec\n", completions.stream().mapToDouble(d -> d).max().orElse(0.0));
+
+        System.out.println("Drone Utilization (Active / Total Simulation Time):");
+        activeTimes.forEach((id, active) -> {
+            double utilization = (totalDuration > 0) ? (active / totalDuration) * 100 : 0;
+            System.out.printf(" - %s: %.2f%% (%.2f sec active)\n", id, utilization, active);
+        });
+
+        System.out.printf("\nTotal Simulation Duration: %.2f sec\n", totalDuration);
+        System.out.println("====================================================\n");
     }
 }

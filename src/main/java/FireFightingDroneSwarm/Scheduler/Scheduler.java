@@ -405,7 +405,7 @@ public class Scheduler implements Runnable {
         FaultType faultType = FaultType.values()[faultNum];
 
         FireEvent event = new FireEvent(zoneID, taskType, LocalTime.now(), severity, faultType, eventId);
-        LogManager.Log("SCHEDULER", "FIRE_RECEIVED", "FireID: " + eventId, "Zone: " + zoneID);
+        LogManager.Log("SCHEDULER", "FIRE_RECEIVED", "FireID: " + event.getFireID(), "Zone: " + event.getZoneID());
 
         try {
             put(event);
@@ -605,8 +605,6 @@ public class Scheduler implements Runnable {
      * subsystem or a drone, and then process the packet. Continuously
      * handle fire events in the buffer in the meantime.
      */
-    // Inside Scheduler.java - Ensure this logic in get() or assignDroneEvent()
-// correctly flips the allTasksProcessed flag.
 
     @Override
     public void run() {

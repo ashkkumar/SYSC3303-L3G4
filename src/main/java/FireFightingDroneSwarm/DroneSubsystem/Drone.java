@@ -288,35 +288,38 @@ public class Drone implements Runnable {
 
     /**
      * Simulates fire extinguishing time based on fire severity.
-     * Now if theres a fault detected with the nozzle it'll put the drone out of service
+     * Now if there's a fault detected with the nozzle it'll put the drone out of service
      *
      * @param severity the severity level of the fire
+     * @return true if extinguished successfully, false if a fault occurred
      */
     private boolean extinguish(Severity severity) {
-
         if (injectedFault == FaultType.NOZZLE_JAM && !faultTriggered) {
             LogManager.Log("DRONE_" + droneId, "FAULT", "Type: NOZZLE_JAM");
             faultTriggered = true;
-
             System.out.println("[Drone " + droneId + "] Fault triggered Nozzle Jam.");
             transition(DroneStatus.OUT_OF_SERVICE);
             sendFaultStatus("NOZZLE_JAM");
-
             return false;
         }
 
+        if (currentTask != null) {
+            LogManager.Log("DRONE_" + droneId, "MOVEMENT_ARRIVED", "FireID: " + currentTask.getFireID());        }
+
         int extinguishTime;
 
-        // need a calc
         switch (severity) {
             case LOW -> extinguishTime = 1000;
             case MODERATE -> extinguishTime = 2000;
             case HIGH -> extinguishTime = 3500;
             default -> extinguishTime = 1500;
         }
+
         LogManager.Log("DRONE_" + droneId, "EXTINGUISHING_START", "Severity: " + severity);
         sleep(extinguishTime);
-        LogManager.Log("DRONE_" + droneId, "EXTINGUISHING_END", "WaterUsed: " + calculateWaterUsage(severity));
+        LogManager.Log("DRONE_" + droneId, "EXTINGUISHING_END", "FireID: " + currentTask.getFireID());
+
+
         return true;
     }
 
@@ -361,9 +364,10 @@ public class Drone implements Runnable {
 
         posX = x;
         posY = y;
-        LogManager.Log("DRONE_" + droneId, "MOVEMENT_ARRIVED", "Pos: (" + posX + "," + posY + ")");
+        if (currentTask != null) {
+            LogManager.Log("DRONE_" + droneId, "MOVEMENT_ARRIVED", "FireID: " + currentTask.getFireID());
+        }
         return true;
-
     }
 
     /**

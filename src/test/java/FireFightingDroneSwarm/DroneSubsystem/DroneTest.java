@@ -1,10 +1,10 @@
 package FireFightingDroneSwarm.DroneSubsystem;
 
+import FireFightingDroneSwarm.Events.LogManager;
 import FireFightingDroneSwarm.FireIncidentSubsystem.FireEvent;
 import FireFightingDroneSwarm.FireIncidentSubsystem.Severity;
 import FireFightingDroneSwarm.FireIncidentSubsystem.TaskType;
 import FireFightingDroneSwarm.Scheduler.Scheduler;
-import FireFightingDroneSwarm.Events.LogManager;
 import org.junit.jupiter.api.Test;
 
 import java.net.DatagramPacket;
@@ -14,87 +14,116 @@ import java.time.LocalTime;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Unit tests for the {@link Drone} class.
- * Validates core functionality including state transitions, UDP communication,
- * and error handling for various injected fault types.
- */
 class DroneTest {
-
-    /** Mock logger used to satisfy Drone constructor requirements without file I/O overhead. */
-    private static LogManager mockLogger = new LogManager();
+    // LogManager might need a mock or a dummy instance
+    private static LogManager dummyLogger = null;
 
     /**
-     * A specialized version of {@link Drone} for testing purposes.
-     * Overrides the {@code sleep} method to return immediately, allowing tests
-     * involving travel or extinguishing simulations to run without real-time delays.
+     * Test drone that disables real sleeping so tests run instantly.
      */
     static class TestDrone extends Drone {
-        /**
-         * Constructs a TestDrone with mock dependencies.
-         * @param id The unique identifier for the test drone.
-         */
         public TestDrone(int id) {
-            super(id, null, null, mockLogger);
+            super(id);
         }
 
-        /**
-         * Overrides the standard sleep to prevent execution delays during testing.
-         * @param ms The requested sleep duration (ignored).
-         */
+        public TestDrone(int id, Scheduler scheduler) {
+            super(id, scheduler, null, null);
+        }
+
         @Override
         protected void sleep(int ms) {
-            // No-op for instant test execution
+            // do nothing (prevents real delay)
         }
     }
 
-    /**
-     * Verifies that the {@link TestDrone#sleep(int)} override effectively
-     * bypasses the {@link Thread#sleep(long)} call.
-     */
     @Test
     void testSleep() {
+        // Use TestDrone to verify the override works
         TestDrone drone = new TestDrone(1);
 
         long start = System.currentTimeMillis();
         drone.sleep(2000);
         long end = System.currentTimeMillis();
 
-        assertTrue(end - start < 50, "Sleep should be overridden and return immediately");
+        // If sleep is overridden, it should take almost 0ms.
+        // We assert it took less than 100ms.
+        assertTrue((end - start) < 100, "Sleep should be overridden and return immediately");
     }
 
-    /**
-     * Verifies that a drone is initialized with the correct default values
-     * for position, state, and resources.
-     */
     @Test
-    void testInitialConditions() {
+    void testGetPosX() {
         Drone drone = new Drone(1);
         assertEquals(0.0, drone.getPosX(), 1e-9);
+    }
+
+    @Test
+    void testGetPosY() {
+        Drone drone = new Drone(1);
         assertEquals(0.0, drone.getPosY(), 1e-9);
+    }
+
+    @Test
+    void testGetStatus() {
+        Drone drone = new Drone(1);
         assertEquals(DroneStatus.IDLE, drone.getStatus());
+    }
+
+    @Test
+    void testGetWaterTank() {
+        Drone drone = new Drone(1);
         assertEquals(100, drone.getWaterTank());
     }
 
-    /**
-     * Ensures that the drone state machine prevents illegal transitions.
-     * For example, a drone should not move from IDLE to ARRIVED without traveling first.
-     */
     @Test
     void testTransition() {
         Drone drone = new Drone(1);
+        // Attempt illegal move (IDLE -> ARRIVED is blocked by switch case)
         drone.transition(DroneStatus.ARRIVED);
         assertEquals(DroneStatus.IDLE, drone.getStatus());
     }
 
+    @Test
+    void testSendStatusUDP() throws Exception {
+        DatagramSocket receiver = new DatagramSocket(null);
+        receiver.setReuseAddress(true);
+        receiver.bind(new InetSocketAddress(50000));
+        receiver.setSoTimeout(2000);
+
+        Drone drone = new Drone(1);
+        String statusMsg = "1,IDLE,0.0,0.0,100";
+
+        drone.sendStatus(statusMsg);
+
+        byte[] buffer = new byte[100];
+        DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+
+        receiver.receive(packet);
+        String received = new String(packet.getData(), 0, packet.getLength());
+
+        assertEquals(statusMsg, received);
+        receiver.close();
+    }
+
     /**
-     * Validates recovery from a {@link FaultType#STUCK_MID_FLIGHT}.
-     * Tests that the drone triggers the fault, stops travel, and executes
-     * the logic to return to base and reset to IDLE.
+     * Helper to access private fields in Drone class
      */
+    private void setPrivateField(Object target, String fieldName, Object value) throws Exception {
+        var field = Drone.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        field.set(target, value);
+    }
+
+    private Object getPrivateField(Object target, String fieldName) throws Exception {
+        var field = Drone.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return field.get(target);
+    }
+
     @Test
     void testStuckMidFlightFault() throws Exception {
         TestDrone drone = new TestDrone(1);
+
+        // Setup task with fault
         drone.currentTask = new FireEvent(3, TaskType.FIRE_DETECTED, LocalTime.now(), Severity.HIGH, FaultType.STUCK_MID_FLIGHT, 1);
         drone.zoneCenter = new double[]{800.0, 0.0};
 
@@ -103,76 +132,65 @@ class DroneTest {
         drone.executeTask();
 
         assertTrue((boolean) getPrivateField(drone, "faultTriggered"), "Fault should have been triggered.");
-        assertEquals(DroneStatus.IDLE, drone.getStatus(), "Drone should return to IDLE after base recovery.");
-        assertEquals(0.0, drone.getPosX(), 0.001, "Drone should be back at base position.");
+        // Per Drone.java logic: if STUCK_MID_FLIGHT hits, it transitions to FAULTED, sleeps, then returns false.
+        // The executeTask() catch then sends it to RETURNING -> REFILLING -> IDLE.
+        assertEquals(DroneStatus.IDLE, drone.getStatus());
+        assertEquals(0.0, drone.getPosX(), 0.001);
     }
 
-    /**
-     * Validates the handling of a {@link FaultType#NOZZLE_JAM}.
-     * Tests that the drone enters an {@code OUT_OF_SERVICE} state and halts
-     * extinguishing operations immediately.
-     */
     @Test
     void testNozzleJamFault() throws Exception {
         TestDrone drone = new TestDrone(2);
-        drone.currentTask = new FireEvent(4, TaskType.FIRE_DETECTED, LocalTime.now(), Severity.MODERATE, FaultType.NOZZLE_JAM, 1);
 
-        setPrivateField(drone, "injectedFault", FaultType.NOZZLE_JAM);
+        drone.currentTask = new FireEvent(4, TaskType.FIRE_DETECTED, LocalTime.now(), Severity.MODERATE, FaultType.NOZZLE_JAM, 1);
+        drone.zoneCenter = new double[]{400.0, 0.0};
+
         setPrivateField(drone, "faultTriggered", false);
 
         drone.executeTask();
 
+        // Nozzle Jam leads to OUT_OF_SERVICE in extinguish()
         assertEquals(DroneStatus.OUT_OF_SERVICE, drone.getStatus());
+        assertEquals(100, drone.getWaterTank(), "Water should not be consumed if nozzle is jammed.");
     }
 
-    /**
-     * Validates the {@link FaultType#PACKET_LOSS} behavior.
-     * Ensures that when this fault is active, {@code sendStatus} does not
-     * transmit data over the network.
-     */
     @Test
     void testPacketLossDropsStatusPacket() throws Exception {
         DatagramSocket receiver = new DatagramSocket(null);
         receiver.setReuseAddress(true);
         receiver.bind(new InetSocketAddress(50000));
-        receiver.setSoTimeout(500);
+        receiver.setSoTimeout(1000);
 
         TestDrone drone = new TestDrone(3);
-        drone.currentTask = new FireEvent(1, TaskType.FIRE_DETECTED, LocalTime.now(), Severity.LOW, FaultType.PACKET_LOSS, 3);
+        drone.currentTask = new FireEvent(3, TaskType.FIRE_DETECTED, LocalTime.now(), Severity.LOW, FaultType.PACKET_LOSS, 3);
 
         setPrivateField(drone, "injectedFault", FaultType.PACKET_LOSS);
 
+        // This call should trigger the fault check and return early
+        drone.sendStatus("3,IDLE,0.0,0.0,100");
+
+        byte[] buffer = new byte[100];
+        DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+
         assertThrows(java.net.SocketTimeoutException.class, () -> {
-            drone.sendStatus("3,IDLE,0.0,0.0,100");
-            byte[] buffer = new byte[100];
-            DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
             receiver.receive(packet);
-        });
+        }, "Packet should have been dropped due to packet loss fault");
 
         receiver.close();
     }
 
-    /**
-     * Reflection helper to set private fields for testing state-dependent logic.
-     * @param target The object whose field is being set.
-     * @param fieldName The name of the private field.
-     * @param value The value to assign to the field.
-     */
-    private void setPrivateField(Object target, String fieldName, Object value) throws Exception {
-        var field = Drone.class.getDeclaredField(fieldName);
-        field.setAccessible(true);
-        field.set(target, value);
-    }
+    @Test
+    void testNormalMissionCompletesSuccessfully() throws Exception {
+        TestDrone drone = new TestDrone(4);
 
-    /**
-     * Reflection helper to access private fields for assertion checking.
-     * @param target The object whose field is being accessed.
-     * @param fieldName The name of the private field.
-     * @return The value of the field.
-     */
-    private Object getPrivateField(Object target, String fieldName) throws Exception {
-        var field = Drone.class.getDeclaredField(fieldName);
-        field.setAccessible(true);
-        return field.get(target);
+        drone.currentTask = new FireEvent(5, TaskType.FIRE_DETECTED, LocalTime.now(), Severity.LOW, FaultType.NONE, 1);
+        drone.zoneCenter = new double[]{200.0, 0.0};
+
+        drone.executeTask();
+
+        assertEquals(DroneStatus.IDLE, drone.getStatus());
+        // 100 - 20 (LOW severity) + Refill = 100
+        assertEquals(100, drone.getWaterTank());
+        assertEquals(0.0, drone.getPosX(), 0.001);
     }
 }
