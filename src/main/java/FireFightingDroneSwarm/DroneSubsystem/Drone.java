@@ -109,6 +109,8 @@ public class Drone implements Runnable {
                 } else {
                     statusMsg += "," + 0;
                 }
+
+                sendGuiUpdate("DRONE_UPDATE", (currentTask != null) ? currentTask.getZoneID() : 0);
                 sendStatus(statusMsg);
                 receiveFireEvent();
 
@@ -371,6 +373,7 @@ public class Drone implements Runnable {
             posX += stepX;
             posY += stepY;
 
+            sendGuiUpdate("DRONE_UPDATE", currentTask.getZoneID());
             sendStatus(droneId + "," + status + "," + posX + "," + posY + "," + waterTank + "," + currentTask.getFireID());
             sleep((int) stepTime);
         }
@@ -596,21 +599,33 @@ public class Drone implements Runnable {
     }
 
     /**
-     * Helper method to change GUI view using UDP packets
-     *
-     * @param type   event type either "DRONE_DISPATCHED" or "DRONE_RETURNING"
-     * @param zoneId int representing zone to which drone is travelling
+     * Function to send updates to the GUI via UDP in order to track
+     * each drone's state including position.
+     * @param type a String representing the type of event for example: DRONE_FAULTED
+     * @param zoneId the zone in which the drone is situated
      */
     private void sendGuiUpdate(String type, int zoneId) {
         try {
-            String msg = type + "," + zoneId;
+            String fault = (status == DroneStatus.FAULTED || status == DroneStatus.OUT_OF_SERVICE)
+                    ? "FAULT"
+                    : "OK";
+
+            String msg =
+                    type + "," +
+                            droneId + "," +
+                            status + "," +
+                            posX + "," +
+                            posY + "," +
+                            zoneId + "," +
+                            waterTank + "," +
+                            fault;
+
             byte[] data = msg.getBytes();
 
             DatagramPacket packet =
                     new DatagramPacket(data, data.length, InetAddress.getLocalHost(), 60000);
 
             sendReceiveSocket.send(packet);
-            System.out.println("Drone sending packet to GUI");
 
         } catch (IOException e) {
             e.printStackTrace();
