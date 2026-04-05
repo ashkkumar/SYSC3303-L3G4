@@ -57,27 +57,71 @@ public class UDPZoneMapController implements Runnable {
     private void handlePacket(String message) {
         String[] parts = message.split(",");
         System.out.println(parts[0]);
+
         switch (parts[0]) {
+
             case "FIRE_EVENT" -> {
                 int zoneId = Integer.parseInt(parts[1]);
                 SwingUtilities.invokeLater(() -> controller.fireDetected(zoneId));
             }
+
             case "DRONE_DISPATCHED" -> {
                 int zoneId = Integer.parseInt(parts[1]);
-                System.out.println(zoneId);
-                System.out.println("Sending controller drone dispatched");
                 SwingUtilities.invokeLater(() -> controller.droneDispatched(zoneId));
             }
+
             case "DRONE_RETURNING" -> {
                 int zoneId = Integer.parseInt(parts[1]);
                 SwingUtilities.invokeLater(() -> controller.droneReturning(zoneId));
             }
-            case "DRONE_FAULTED" -> {
-                int zoneId = Integer.parseInt(parts[1]);
-                SwingUtilities.invokeLater(() -> controller.droneFaulted(zoneId));
-            }
-            case "ZONE_INIT" -> {
 
+            case "DRONE_FAULTED" -> {
+                int droneId = Integer.parseInt(parts[1]);
+                String status = parts[2];
+                double posX = Double.parseDouble(parts[3]);
+                double posY = Double.parseDouble(parts[4]);
+                int zoneId = Integer.parseInt(parts[5]);
+                int water = Integer.parseInt(parts[6]);
+                String fault = parts[7];
+
+                SwingUtilities.invokeLater(() -> controller.droneFaulted(zoneId));
+
+                SwingUtilities.invokeLater(() ->
+                        controller.updateDroneStatus(
+                                droneId,
+                                status,
+                                posX,
+                                posY,
+                                zoneId,
+                                water,
+                                fault
+                        )
+                );
+            }
+
+            case "DRONE_UPDATE" -> {
+                int droneId = Integer.parseInt(parts[1]);
+                String status = parts[2];
+                double posX = Double.parseDouble(parts[3]);
+                double posY = Double.parseDouble(parts[4]);
+                int zoneId = Integer.parseInt(parts[5]);
+                int water = Integer.parseInt(parts[6]);
+                String fault = parts[7];
+
+                SwingUtilities.invokeLater(() ->
+                        controller.updateDroneStatus(
+                                droneId,
+                                status,
+                                posX,
+                                posY,
+                                zoneId,
+                                water,
+                                fault
+                        )
+                );
+            }
+
+            case "ZONE_INIT" -> {
                 int id = Integer.parseInt(parts[1]);
                 int startX = Integer.parseInt(parts[2]);
                 int startY = Integer.parseInt(parts[3]);
@@ -85,13 +129,14 @@ public class UDPZoneMapController implements Runnable {
                 int endY = Integer.parseInt(parts[5]);
 
                 Zone zone = new Zone(id,
-                        new int[]{startX,startY},
-                        new int[]{endX,endY});
+                        new int[]{startX, startY},
+                        new int[]{endX, endY});
 
                 zones.add(zone);
 
                 SwingUtilities.invokeLater(() -> controller.initializeZones(zones));
             }
+
             default -> System.out.println("Unknown packet type: " + parts[0]);
         }
     }

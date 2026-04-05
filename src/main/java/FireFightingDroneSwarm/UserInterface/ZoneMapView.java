@@ -21,6 +21,7 @@ public class ZoneMapView {
     private static final int CELL_SIZE = 10;
 
     private ZoneMapPanel zoneMap;
+    private JTextArea statusTextArea;
 
     public ZoneMapView(){
         zoneLengths = new HashMap<>();
@@ -49,11 +50,48 @@ public class ZoneMapView {
         backgroundPanel.add(zoneMap);
 
         frame.add(backgroundPanel, BorderLayout.CENTER);
+
+        JPanel rightPanel = new JPanel();
+        rightPanel.setLayout(new BorderLayout());
+        rightPanel.setPreferredSize(new Dimension(300, 600));
+        rightPanel.setBackground(Color.WHITE);
+
+        JPanel textPanel = createTextPanel();
+        rightPanel.add(textPanel, BorderLayout.NORTH);
+
         JPanel legend = createLegendPanel();
-        legend.setPreferredSize(new Dimension(300, 600));
-        frame.add(legend, BorderLayout.EAST);
+        rightPanel.add(legend, BorderLayout.CENTER);
+
+        frame.add(rightPanel, BorderLayout.EAST);
 
         frame.setVisible(true);
+    }
+
+    public void appendDroneStatus(String text) {
+        if (statusTextArea != null) {
+            statusTextArea.append(text + "\n");
+        }
+    }
+
+    /**
+     * This function creates the text panel for viewing drone locations and updates
+     * on the GUI.
+     * @return JPanel for the text panel with location information.
+     */
+    private JPanel createTextPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(Color.WHITE);
+        panel.setBorder(BorderFactory.createTitledBorder("Drone Status"));
+
+        statusTextArea = new JTextArea(8, 20);
+        statusTextArea.setEditable(false);
+        statusTextArea.setLineWrap(true);
+        statusTextArea.setWrapStyleWord(true);
+
+        JScrollPane scrollPane = new JScrollPane(statusTextArea);
+        panel.add(scrollPane, BorderLayout.CENTER);
+
+        return panel;
     }
 
     /**
@@ -77,7 +115,7 @@ public class ZoneMapView {
         addLegendItem(legend, gbc, "D(n)", new Color(255, 165, 0), "Drone outbound", Color.BLACK);
         addLegendItem(legend, gbc, "D(n)", new Color(34, 139, 34), "Drone Extinguishing fire", Color.WHITE);
         addLegendItem(legend, gbc, "D(3)", new Color(180, 130, 180), "Drone Returning", Color.BLACK);
-
+        addLegendItem(legend, gbc, " ", Color.BLACK, "Drone Fault", Color.WHITE);
         return legend;
     }
 

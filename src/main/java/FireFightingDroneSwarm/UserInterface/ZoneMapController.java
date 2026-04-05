@@ -4,6 +4,8 @@ import FireFightingDroneSwarm.FireIncidentSubsystem.Zone;
 
 import javax.swing.*;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * This class acts as the controller portion of a typical
@@ -15,6 +17,7 @@ import java.util.ArrayList;
 public class ZoneMapController {
 
     private final ZoneMapView view;
+    private Map<Integer, String> droneStates = new HashMap<>();
 
     /**
      * Constructor for the controller, instantiate with the global
@@ -59,6 +62,29 @@ public class ZoneMapController {
      */
     public void droneReturning(int zoneId) {
         SwingUtilities.invokeLater(() -> view.droneReturning(zoneId));
+    }
+
+    public void updateDroneStatus(int droneId, String status,
+                                  double x, double y,
+                                  int zoneId, int water,
+                                  String fault) {
+
+        String info =
+                "Drone " + droneId +
+                        " | " + status +
+                        " | Zone " + zoneId +
+                        " | (" + String.format("%.1f", x) + "," + String.format("%.1f", y) + ")" +
+                        " | Water: " + water +
+                        " | " + fault;
+
+        droneStates.put(droneId, info);
+
+        StringBuilder full = new StringBuilder("DRONE STATUS\n\n");
+        for (String s : droneStates.values()) {
+            full.append(s).append("\n");
+        }
+
+        view.appendDroneStatus(full.toString());
     }
 
     public void droneFaulted(int zoneId) {
