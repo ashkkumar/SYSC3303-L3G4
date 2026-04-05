@@ -161,6 +161,19 @@ public class Drone implements Runnable {
         }
         transition(DroneStatus.ARRIVED);
 
+        int amountNeeded = calculateWaterUsage(currentTask.getSeverity());
+        if (waterTank < amountNeeded) {
+            System.out.println("[Drone " + droneId + "] Not enough water for task. Returning.");
+            transition(DroneStatus.RETURNING);
+            boolean returned = travelTo(BASE_X, BASE_Y);
+            if (returned) {
+                transition(DroneStatus.REFILLING);
+                refill();
+                transition(DroneStatus.IDLE);
+            }
+            return;
+        }
+
         transition(DroneStatus.DROPPING_AGENT);
         boolean success = extinguish(currentTask.getSeverity());
 
@@ -361,7 +374,7 @@ public class Drone implements Runnable {
      * @param severity The severity level of the fire event.
      * @return The integer amount of water units to be used.
      */
-    private int calculateWaterUsage(Severity severity) {
+    public static int calculateWaterUsage(Severity severity) {
         return switch (severity) {
             case LOW -> 20;
             case MODERATE -> 30;
@@ -592,6 +605,15 @@ public class Drone implements Runnable {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * Checks to see if drone has enough water to service fire
+     * @param severity, severity of the fire
+     * @return True if the drone has enough water
+     */
+    public boolean enoughWater(Severity severity) {
+        return waterTank >=  calculateWaterUsage(severity);
     }
 
     public static void main(String[] args) {

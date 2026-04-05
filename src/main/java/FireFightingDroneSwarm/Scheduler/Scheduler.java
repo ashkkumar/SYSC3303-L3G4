@@ -190,6 +190,8 @@ public class Scheduler implements Runnable {
             for (DroneState drone : droneStates.values()) {
                 if (drone.getStatus() != DroneStatus.IDLE) continue;
                 if (activeAssignments.get(drone.getDroneId()) != null) continue;
+                int requiredWater = Drone.calculateWaterUsage(event.getSeverity());
+                if (drone.getWaterTank() < requiredWater) continue;
 
 
                 // Calculate the drone's distance to the zone center
@@ -628,6 +630,10 @@ public class Scheduler implements Runnable {
             map.put(z.getID(), z);
         }
         return map;
+    }
+
+    public FireEvent getActiveAssignmentForDrone(int droneId) {
+        return activeAssignments.get(droneId);
     }
 
     public static void main(String[] args) {
