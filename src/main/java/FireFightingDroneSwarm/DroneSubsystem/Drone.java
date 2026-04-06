@@ -115,7 +115,7 @@ public class Drone implements Runnable {
                     statusMsg += "," + 0;
                 }
 
-                sendGuiUpdate("DRONE_UPDATE", (currentTask != null) ? currentTask.getZoneID() : 0);
+                //sendGuiUpdate("DRONE_UPDATE", (currentTask != null) ? currentTask.getZoneID() : 0);
                 sendStatus(statusMsg);
                 receiveFireEvent();
                 decBatteryLife();
@@ -681,9 +681,23 @@ public class Drone implements Runnable {
         Thread newDrone = new Thread(new Drone(1));
         Thread droneTwo = new Thread(new Drone(2));
         Thread droneThree = new Thread(new Drone(3));
+        Thread droneFour = new Thread(new Drone(4));
+        Thread droneFive = new Thread(new Drone(5));
+        Thread droneSix = new Thread(new Drone(6));
+        Thread droneSeven = new Thread(new Drone(7));
+        Thread droneEight = new Thread(new Drone(8));
+        Thread droneNine = new Thread(new Drone(9));
+        Thread droneTen = new Thread(new Drone(10));
 
         newDrone.start();
         droneTwo.start();
         droneThree.start();
+        droneFour.start();
+        droneFive.start();
+        droneSix.start();
+        droneSeven.start();
+        droneEight.start();
+        droneNine.start();
+        droneTen.start();
     }
 }

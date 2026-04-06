@@ -662,7 +662,7 @@ public class Scheduler implements Runnable {
         InputReader inputReader =
                 new InputReader("sample_event_multiple.csv",
                         "sample_zone_multiple.csv");
-        Scheduler scheduler = new Scheduler(15);
+        Scheduler scheduler = new Scheduler(60);
         scheduler.setZoneIDs(Scheduler.buildZoneMap(inputReader.parseZoneFile()));
         Thread schedulerThread = new Thread(scheduler);
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
