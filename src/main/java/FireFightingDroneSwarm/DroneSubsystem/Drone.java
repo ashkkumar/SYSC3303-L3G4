@@ -661,6 +661,9 @@ public class Drone implements Runnable {
         }
     }
 
+    /**
+     * Decrement the life of the battery
+     */
     public void decBatteryLife() {
         batteryLife -= 0.1;
     }
