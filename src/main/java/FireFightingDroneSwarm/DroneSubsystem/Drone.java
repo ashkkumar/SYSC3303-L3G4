@@ -118,7 +118,7 @@ public class Drone implements Runnable {
                 sendGuiUpdate("DRONE_UPDATE", (currentTask != null) ? currentTask.getZoneID() : 0);
                 sendStatus(statusMsg);
                 receiveFireEvent();
-                batteryLife -= 0.01;
+                decBatteryLife();
 
                 Thread.sleep(5000);
 
@@ -662,7 +662,7 @@ public class Drone implements Runnable {
     }
 
     public void decBatteryLife() {
-        batteryLife -= 1;
+        batteryLife -= 0.1;
     }
 
     /**
