@@ -678,12 +678,9 @@ public class Drone implements Runnable {
     }
 
     public static void main(String[] args) {
-        Thread newDrone = new Thread(new Drone(1));
-        Thread droneTwo = new Thread(new Drone(2));
-        Thread droneThree = new Thread(new Drone(3));
-
-        newDrone.start();
-        droneTwo.start();
-        droneThree.start();
+        for (int i = 1; i <= 10; i++) {
+            Thread drone = new Thread(new Drone(i));
+            drone.start();
+        }
     }
 }
