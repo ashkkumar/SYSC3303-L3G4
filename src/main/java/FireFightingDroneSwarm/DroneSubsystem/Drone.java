@@ -20,7 +20,7 @@ public class Drone implements Runnable {
     private Scheduler scheduler = null;
     private static final double DRONE_SPEED = 80.0; // units per second (Iteration 0)
     private int waterTank;
-    private static final int MAX_TANK = 100;
+    private static final int MAX_TANK = 15;
     private boolean hasFuel = true;
     double[] zoneCenter = new double[2];
     private FaultType injectedFault = FaultType.NONE;
@@ -410,9 +410,9 @@ public class Drone implements Runnable {
      */
     public static int calculateWaterUsage(Severity severity) {
         return switch (severity) {
-            case LOW -> 20;
-            case MODERATE -> 30;
-            case HIGH -> 50;
+            case LOW -> 5;
+            case MODERATE -> 10;
+            case HIGH -> 15;
         };
     }
 

@@ -192,8 +192,6 @@ public class Scheduler implements Runnable {
             for (DroneState drone : droneStates.values()) {
                 if (drone.getStatus() != DroneStatus.IDLE) continue;
                 if (activeAssignments.get(drone.getDroneId()) != null) continue;
-                int requiredWater = Drone.calculateWaterUsage(event.getSeverity());
-                if (drone.getWaterTank() < requiredWater) continue;
 
 
                 // Calculate the drone's distance to the zone center
@@ -233,11 +231,30 @@ public class Scheduler implements Runnable {
                     + " to Zone "
                     + bestEvent.getZoneID());
 
+            int requiredWater = Drone.calculateWaterUsage(bestEvent.getSeverity());
+            if (bestDrone.getWaterTank() < requiredWater) {
+                if (bestEvent.isPreServiced()) {
+                    activeAssignments.put(bestDrone.getDroneId(), bestEvent);
+                    assignmentStartTimes.put(bestDrone.getDroneId(), System.currentTimeMillis());
+                    bestDrone.update(DroneStatus.EN_ROUTE, bestDrone.getPosX(), bestDrone.getPosY(), bestDrone.getWaterTank());
+                    //this.currentEvent = bestEvent;
+                    this.sendFireEventToDrone(bestDrone, bestEvent);
+                } else {
+                    bestEvent.setPreServiced(true);
+                    activeAssignments.put(bestDrone.getDroneId(), bestEvent);
+                    assignmentStartTimes.put(bestDrone.getDroneId(), System.currentTimeMillis());
+                    bestDrone.update(DroneStatus.EN_ROUTE, bestDrone.getPosX(), bestDrone.getPosY(), bestDrone.getWaterTank());
+                    //this.currentEvent = bestEvent;
+                    this.sendFireEventToDrone(bestDrone, bestEvent);
+                    activeAssignments.put(bestDrone.getDroneId(), bestEvent);
+
+                }
+            }
             activeAssignments.put(bestDrone.getDroneId(), bestEvent);
             assignmentStartTimes.put(bestDrone.getDroneId(), System.currentTimeMillis());
             bestDrone.update(DroneStatus.EN_ROUTE, bestDrone.getPosX(), bestDrone.getPosY(), bestDrone.getWaterTank());
-           //this.currentEvent = bestEvent;
-           this.sendFireEventToDrone(bestDrone, bestEvent);
+            //this.currentEvent = bestEvent;
+            this.sendFireEventToDrone(bestDrone, bestEvent);
         }
     }
 
