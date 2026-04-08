@@ -16,6 +16,7 @@ public class FireEvent {
     private Scheduler scheduler;
     private FaultType fault;
     private int fireID;
+    private boolean preServiced = false;
 
     /**
      * Constructor for a FireEvent object, to represent incoming fire events.
@@ -73,6 +74,22 @@ public class FireEvent {
      * @param fault
      */
     public void setFault(FaultType fault) {this.fault=fault;}
+
+    /**
+     * Gets the preserviced variable, for sending multiple drones to 1 fire
+     * @return
+     */
+    public boolean isPreServiced() {
+        return preServiced;
+    }
+
+    /**
+     * Sets the preserviced variable, for sending multiple drones to 1 fire
+     * @param preServiced
+     */
+    public void setPreServiced(boolean preServiced) {
+        this.preServiced = preServiced;
+    }
 
     /**
      * Override toString() method to return a representation of this event and its fields
