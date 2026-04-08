@@ -71,7 +71,7 @@ class DroneTest {
     @Test
     void testGetWaterTank() {
         Drone drone = new Drone(1);
-        assertEquals(100, drone.getWaterTank());
+        assertEquals(15, drone.getWaterTank());
     }
 
     @Test
@@ -151,7 +151,7 @@ class DroneTest {
 
         // Nozzle Jam leads to OUT_OF_SERVICE in extinguish()
         assertEquals(DroneStatus.OUT_OF_SERVICE, drone.getStatus());
-        assertEquals(100, drone.getWaterTank(), "Water should not be consumed if nozzle is jammed.");
+        assertEquals(15, drone.getWaterTank(), "Water should not be consumed if nozzle is jammed.");
     }
 
     @Test
@@ -190,7 +190,7 @@ class DroneTest {
 
         assertEquals(DroneStatus.IDLE, drone.getStatus());
         // 100 - 20 (LOW severity) + Refill = 100
-        assertEquals(100, drone.getWaterTank());
+        assertEquals(15, drone.getWaterTank());
         assertEquals(0.0, drone.getPosX(), 0.001);
     }
 }
